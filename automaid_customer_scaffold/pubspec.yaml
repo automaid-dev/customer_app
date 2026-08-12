@@ -1,0 +1,74 @@
+name: automaid_customer
+description: Automaid — customer app for laundry pickup, wash, and delivery.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Networking
+  dio: ^5.4.3+1
+
+  # Secure token storage
+  flutter_secure_storage: ^9.2.2
+
+  # Routing
+  go_router: ^14.2.0
+
+  # QR scanning (bag QR display / scan-to-claim)
+  mobile_scanner: ^5.1.1
+  qr_flutter: ^4.1.0
+
+  # Photo capture (booking instructions, profile avatar)
+  image_picker: ^1.1.2
+
+  # Map location picker (sign-up address confirmation)
+  google_maps_flutter: ^2.9.0
+  geolocator: ^13.0.1
+
+  # In-app payment gateway (Fiuu checkout)
+  webview_flutter: ^4.10.0
+
+  # Receipt PDF generation + share/download
+  pdf: ^3.11.1
+  printing: ^5.13.4
+
+  # Utilities
+  intl: ^0.19.0
+  json_annotation: ^4.9.0
+
+  # Brand type (friendly, rounded — matches the LaundryBar mascot)
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.11
+  json_serializable: ^6.8.0
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.jpeg"
+  min_sdk_android: 21
+  # The source image has a busy angular red/blue/yellow background — on
+  # Android's adaptive-icon masks (circle, squircle, rounded square) that
+  # background can look cropped oddly. If the generated icon looks off,
+  # swap in a version of the mascot on a plain background and re-run.
+  adaptive_icon_background: "#1565C0"
+  adaptive_icon_foreground: "assets/icon/app_icon.jpeg"
