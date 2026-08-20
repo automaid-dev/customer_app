@@ -353,14 +353,16 @@ class CustomerRepository {
     return _data(json, fallback: 'Could not load order.')['order'] as Map<String, dynamic>;
   }
 
-  /// NOTE: as of this backend version, OrderController::orderActive and
-  /// orderUpcoming don't actually return any list data (the controller
-  /// methods query but never assign to `$data` or return a payload) —
-  /// this is a backend gap, not a mistake in this client. Use `home()`
-  /// (which correctly returns active bookings) until the backend is fixed;
-  /// these two are wired up so they start working the moment the backend does.
-  Future<Map<String, dynamic>> orderActive() => _api.post(ApiEndpoints.customerOrderActive);
-  Future<Map<String, dynamic>> orderUpcoming() => _api.post(ApiEndpoints.customerOrderUpcoming);
+  /// Every order for this customer, any status (including cancelled) —
+  /// now genuinely implemented server-side. Previously a backend stub
+  /// that never returned data, so the order list screen worked around
+  /// it by reusing the home dashboard's "active bookings" only — which
+  /// is why a cancelled order never showed up anywhere at all.
+  Future<List<Map<String, dynamic>>> orderHistory() async {
+    final json = await _api.post(ApiEndpoints.customerOrderActive);
+    return (_data(json, fallback: 'Could not load orders.')['orders'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>();
+  }
 
   Future<Map<String, dynamic>> rateOrder({
     required int orderId,

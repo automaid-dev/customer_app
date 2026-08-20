@@ -216,6 +216,13 @@ class BookingDraftNotifier extends Notifier<BookingDraft> {
           birthdayReward: s.birthdayRewardSelected ? s.birthdayRewardAmount : null,
         );
     reset();
+    // A subscribed customer's booking consumes a quota slot server-side
+    // (orders_used_current_cycle) — without invalidating this, the
+    // dashboard kept showing the pre-booking "0/4" until something else
+    // happened to trigger a refresh, even though the backend had
+    // already updated correctly.
+    ref.invalidate(currentSubscriptionProvider);
+    ref.invalidate(homeBookingsProvider);
     return result;
   }
 

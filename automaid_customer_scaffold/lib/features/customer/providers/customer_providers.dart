@@ -55,6 +55,13 @@ final notificationsProvider = FutureProvider.autoDispose((ref) {
   return ref.read(customerRepositoryProvider).notifications();
 });
 
+/// Every order for this customer, any status — powers the "My orders"
+/// list screen. Replaces the earlier home-dashboard-bookings workaround
+/// now that the backend endpoint actually works.
+final orderHistoryProvider = FutureProvider.autoDispose((ref) {
+  return ref.read(customerRepositoryProvider).orderHistory();
+});
+
 /// Addresses aren't served by a dedicated "list my addresses" endpoint on
 /// this backend — they come embedded in the customer profile response
 /// (ProfileController::profile eager-loads `addresses`). We surface that

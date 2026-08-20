@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../providers/customer_providers.dart';
+import 'booking_receipt_screen.dart';
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen({super.key, required this.orderId});
@@ -80,7 +81,19 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Order #${widget.orderId}')),
+      appBar: AppBar(
+        title: Text('Order #${widget.orderId}'),
+        actions: [
+          if (_order != null)
+            IconButton(
+              icon: const Icon(Icons.receipt_long_outlined),
+              tooltip: 'View / download receipt',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => BookingReceiptScreen(orderId: widget.orderId)),
+              ),
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -130,6 +143,31 @@ class _StatusTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final orderStatus = order['status']?.toString().toLowerCase();
+    if (orderStatus == 'cancelled' || orderStatus == 'cancel') {
+      return Card(
+        color: Colors.red.withValues(alpha: 0.08),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.cancel_outlined, color: Colors.red),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('Order cancelled', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('This order was cancelled by our team. Contact support if you have questions.'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final statuses = (order['customer_order_statuses'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
     bool isDone(String code) =>

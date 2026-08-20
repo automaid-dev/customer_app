@@ -17,6 +17,7 @@ class AppSetting {
   final String? companyPhone;
   final String? companyEmail;
   final String? companyRegistrationNo;
+  final String? sameDayCutoffTime;
 
   AppSetting({
     required this.washFee,
@@ -35,6 +36,7 @@ class AppSetting {
     this.companyPhone,
     this.companyEmail,
     this.companyRegistrationNo,
+    this.sameDayCutoffTime,
   });
 
   factory AppSetting.fromJson(Map<String, dynamic> json) => AppSetting(
@@ -55,6 +57,7 @@ class AppSetting {
         companyPhone: json['company_phone']?.toString(),
         companyEmail: json['company_email']?.toString(),
         companyRegistrationNo: json['company_registration_no']?.toString(),
+        sameDayCutoffTime: json['same_day_cutoff_time']?.toString(),
       );
 
   static double _d(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;

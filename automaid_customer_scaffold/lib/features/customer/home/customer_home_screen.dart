@@ -3,17 +3,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/models/booking_model.dart';
 import '../../../core/models/subscription_plan_model.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/dashboard_banner.dart';
 import '../providers/customer_providers.dart';
 import '../booking/booking_flow_screen.dart';
-import '../address/address_list_screen.dart';
 import '../bag/bag_screen.dart';
 import '../orders/order_list_screen.dart';
 import '../subscription/subscription_screen.dart';
+import '../subscription/subscription_history_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../profile/customer_profile_screen.dart';
 
-class CustomerHomeScreen extends ConsumerWidget {
+/// Bottom-nav shell for the whole customer app — Home / Bag / Booking /
+/// Transaction history / Profile, each its own self-contained tab (kept
+/// alive via IndexedStack so switching tabs doesn't lose scroll position
+/// or re-fetch data every time).
+class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
+
+  @override
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+}
+
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+  int _tabIndex = 0;
+
+  static const _tabs = [
+    _HomeTab(),
+    BagScreen(),
+    OrderListScreen(),
+    SubscriptionHistoryScreen(),
+    CustomerProfileScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(index: _tabIndex, children: _tabs),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (i) => setState(() => _tabIndex = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.shopping_bag_outlined), selectedIcon: Icon(Icons.shopping_bag), label: 'Bag'),
+          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Booking'),
+          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'History'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeTab extends ConsumerWidget {
+  const _HomeTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,27 +65,6 @@ class CustomerHomeScreen extends ConsumerWidget {
     final unreadCount = notificationsAsync.valueOrNull?.unreadCount ?? 0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Hi, ${user?.name ?? ''}'),
-        actions: [
-          IconButton(
-            icon: Badge(
-              label: Text('$unreadCount'),
-              isLabelVisible: unreadCount > 0,
-              child: const Icon(Icons.notifications_outlined),
-            ),
-            onPressed: () async {
-              await Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
-              ref.invalidate(notificationsProvider);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _confirmLogout(context, ref),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('New booking'),
@@ -54,37 +75,46 @@ class CustomerHomeScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(homeBookingsProvider),
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.zero,
           children: [
-            _QuickActions(
-              onAddresses: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const AddressListScreen())),
-              onBags: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const BagScreen())),
-              onOrders: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const OrderListScreen())),
-              onSubscription: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const SubscriptionScreen())),
+            DashboardBanner(
+              name: user?.name ?? '',
+              mascotAsset: 'assets/images/mascot_customer.png',
+              unreadCount: unreadCount,
+              onNotificationTap: () async {
+                await Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+                ref.invalidate(notificationsProvider);
+              },
             ),
-            const SizedBox(height: 16),
-            const _SubscriptionSection(),
-            const SizedBox(height: 8),
-            Text('Active bookings', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            bookingsAsync.when(
-              data: (bookings) => bookings.isEmpty
-                  ? const Padding(
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  const _SubscriptionSection(),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Active bookings', style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  const SizedBox(height: 8),
+                  bookingsAsync.when(
+                    data: (bookings) => bookings.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(child: Text('No active bookings right now.')),
+                          )
+                        : Column(children: bookings.map((b) => _BookingCard(booking: b)).toList()),
+                    loading: () => const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: Text('No active bookings right now.')),
-                    )
-                  : Column(children: bookings.map((b) => _BookingCard(booking: b)).toList()),
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: Text('Could not load bookings: $e')),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (e, _) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: Text('Could not load bookings: $e')),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -235,105 +265,6 @@ class _SubscribeBanner extends StatelessWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({
-    required this.onAddresses,
-    required this.onBags,
-    required this.onOrders,
-    required this.onSubscription,
-  });
-
-  final VoidCallback onAddresses;
-  final VoidCallback onBags;
-  final VoidCallback onOrders;
-  final VoidCallback onSubscription;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ActionTile(
-            icon: Icons.location_on_rounded,
-            label: 'Addresses',
-            color: AppColors.blue,
-            onTap: onAddresses,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ActionTile(
-            icon: Icons.shopping_bag_rounded,
-            label: 'Bags',
-            color: AppColors.yellow,
-            onTap: onBags,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ActionTile(
-            icon: Icons.receipt_long_rounded,
-            label: 'Orders',
-            color: AppColors.red,
-            onTap: onOrders,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ActionTile(
-            icon: Icons.card_membership_rounded,
-            label: 'Plan',
-            color: AppColors.blueDark,
-            onTap: onSubscription,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Column(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(height: 4),
-              Text(label, style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _BookingCard extends StatelessWidget {
   const _BookingCard({required this.booking});
   final BookingSummary booking;
@@ -344,12 +275,12 @@ class _BookingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: const Icon(Icons.local_laundry_service),
-        title: Text('${booking.pickupBagQuantity} bag(s) — RM${booking.grandTotal.toStringAsFixed(2)}'),
+        title: Text('Order #${booking.orderId} — ${booking.pickupBagQuantity} bag(s)'),
         subtitle: Text(
           booking.pickupDate != null
-              ? 'Pickup: ${booking.pickupDate!.toLocal().toString().split(' ').first} '
+              ? 'RM${booking.grandTotal.toStringAsFixed(2)} · Pickup: ${booking.pickupDate!.toLocal().toString().split(' ').first} '
                   '${booking.pickupStartTime ?? ''}'
-              : 'Status: ${booking.status}',
+              : 'RM${booking.grandTotal.toStringAsFixed(2)} · Status: ${booking.status}',
         ),
         trailing: Chip(label: Text(booking.status)),
         onTap: () => Navigator.of(context).push(
@@ -357,28 +288,5 @@ class _BookingCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Log out?'),
-      content: const Text("You'll need to log in again to access your account."),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Log out'),
-        ),
-      ],
-    ),
-  );
-  if (confirmed == true) {
-    ref.read(authControllerProvider.notifier).logout();
   }
 }

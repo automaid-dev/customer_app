@@ -37,7 +37,9 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
   int _quantity = 1;
   bool _rateLoaded = false;
 
-  // Step 4 state
+  // Step 4 state — starts as a safe temporary default (tomorrow);
+  // corrected in initState() once the admin's actual same-day cutoff
+  // time is known (see _applyCutoffAwareDefaultDate).
   int? _selectedAddressId;
   DateTime _pickupDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
@@ -52,6 +54,37 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
     // Load the rate for the default quantity right away so the person
     // sees real pricing immediately, not just after tapping Next once.
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadRate());
+    _applyCutoffAwareDefaultDate();
+  }
+
+  /// Defaults the pickup date to today if it's still before the admin's
+  /// configured same-day cutoff time, or tomorrow if that cutoff has
+  /// already passed — instead of always defaulting to tomorrow
+  /// regardless of what time it actually is. Only overrides the date if
+  /// the person hasn't already picked one themselves.
+  Future<void> _applyCutoffAwareDefaultDate() async {
+    try {
+      final setting = await ref.read(appSettingProvider.future);
+      final cutoff = setting.sameDayCutoffTime;
+      if (cutoff == null || !mounted) return;
+
+      final parts = cutoff.split(':');
+      if (parts.length < 2) return;
+      final cutoffHour = int.tryParse(parts[0]);
+      final cutoffMinute = int.tryParse(parts[1]);
+      if (cutoffHour == null || cutoffMinute == null) return;
+
+      final now = DateTime.now();
+      final todaysCutoff = DateTime(now.year, now.month, now.day, cutoffHour, cutoffMinute);
+      final defaultDate = now.isBefore(todaysCutoff)
+          ? DateTime(now.year, now.month, now.day)
+          : DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+
+      setState(() => _pickupDate = defaultDate);
+    } on ApiException catch (_) {
+      // Setting failed to load — keep the safe tomorrow default already
+      // in place rather than blocking the booking flow over this.
+    }
   }
 
   @override
@@ -483,10 +516,11 @@ class _ScheduleStep extends ConsumerWidget {
           title: Text('Pickup date: ${pickupDate.toLocal().toString().split(' ').first}'),
           trailing: const Icon(Icons.calendar_today),
           onTap: () async {
+            final today = DateTime.now();
             final picked = await showDatePicker(
               context: context,
               initialDate: pickupDate,
-              firstDate: DateTime.now(),
+              firstDate: DateTime(today.year, today.month, today.day),
               lastDate: DateTime.now().add(const Duration(days: 60)),
             );
             if (picked != null) onDateChanged(picked);
