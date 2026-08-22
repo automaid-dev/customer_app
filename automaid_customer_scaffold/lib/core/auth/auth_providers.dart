@@ -54,30 +54,49 @@ class AuthController extends StateNotifier<AuthState> {
     return result;
   }
 
+  /// Step 1 of sign-up — see AuthRepository.register() for the exact
+  /// backend contract. Does not change auth state (account isn't active
+  /// yet); the caller moves on to the OTP screen and calls
+  /// verifyRegister() next.
+  Future<({bool status, String message, int? userId})> register({
+    required String name,
+    required String email,
+    required String mobileNo,
+    required String password,
+    required String passwordConfirmation,
+    DateTime? dob,
+  }) {
+    return _repo.register(
+      name: name,
+      email: email,
+      mobileNo: mobileNo,
+      password: password,
+      passwordConfirmation: passwordConfirmation,
+      dob: dob,
+    );
+  }
+
   Future<({bool status, String message, int? userId})> resendOtp(String email) {
     return _repo.resendOtp(email);
   }
 
-  /// Verifies OTP for a rider/merchant registration and, on success,
-  /// signs the account in — same effect as login(). Their role-specific
-  /// status (Rider/Merchant) may still be PENDING admin approval even
-  /// though they're authenticated; the home screen checks for that
-  /// separately and shows a pending-approval state instead of the full
-  /// dashboard when needed.
-  Future<AuthResult> verifyRegisterRider({required int userId, required String otp}) async {
-    final result = await _repo.verifyRegisterRider(userId: userId, otp: otp);
-    if (result.token != null && result.status) {
-      state = AuthState.authenticated(result.user);
-    }
-    return result;
+  /// Step 2 of sign-up: verifies the OTP. Deliberately does NOT flip auth
+  /// state here — the token is already saved to secure storage by the repo
+  /// at this point (so authenticated API calls work), but activating state
+  /// is left to [activateSession] so the caller (the OTP screen) can do
+  /// something with the fresh token — e.g. save an address — before the
+  /// router's redirect fires and navigates away from that screen. Flipping
+  /// state immediately here caused exactly that race: the address save
+  /// would sometimes lose to navigation and silently not happen.
+  Future<AuthResult> verifyRegister({required int userId, required String otp}) {
+    return _repo.verifyRegister(userId: userId, otp: otp);
   }
 
-  Future<AuthResult> verifyRegisterMerchant({required int userId, required String otp}) async {
-    final result = await _repo.verifyRegisterMerchant(userId: userId, otp: otp);
-    if (result.token != null && result.status) {
-      state = AuthState.authenticated(result.user);
-    }
-    return result;
+  /// Call once any post-verification work (like saving an address) is
+  /// done, to actually sign the user in and let the router navigate to
+  /// the dashboard.
+  void activateSession(AppUser user) {
+    state = AuthState.authenticated(user);
   }
 
   Future<void> logout() async {
@@ -101,20 +120,6 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(ref.read(apiClientProvider));
-});
-
-/// Live list of Malaysian states from the backend's own seeded data —
-/// use this for the state dropdown in registration instead of free text
-/// (a free-text mismatch caused real bugs in the customer app — e.g. the
-/// Kuala Lumpur federal territory is seeded as "Wp Kuala Lumpur", not
-/// "Kuala Lumpur"). Doesn't require login.
-final statesProvider = FutureProvider.autoDispose((ref) {
-  return ref.read(authRepositoryProvider).states();
-});
-
-/// Bank list for the registration bank-details step.
-final banksProvider = FutureProvider.autoDispose((ref) {
-  return ref.read(authRepositoryProvider).banks();
 });
 
 final StateNotifierProvider<AuthController, AuthState> authControllerProvider =

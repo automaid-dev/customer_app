@@ -36,6 +36,7 @@ class ApiEndpoints {
   static const colors = '/color/index';
 
   static const setting = '/setting';
+  static const subscriptionPlans = '/subscription/plans';
 
   // ---- Authenticated (shared across all roles) ----
   static const profileSaveDevice = '/profile/device';
@@ -89,6 +90,10 @@ class ApiEndpoints {
   static const customerSubscriptionPlaceOrder = '/customer/subscription/placeorder';
   static const customerSubscriptionCancel = '/customer/subscription/cancel';
   static const customerSubscriptionUpdate = '/customer/subscription/update';
+  static const customerSubscriptionUpgrade = '/customer/subscription/upgrade';
+  static const customerSubscriptionHistory = '/customer/subscription/history';
+  static const customerNotifications = '/customer/notifications';
+  static const customerNotificationsRead = '/customer/notifications/read';
 
   static const customerQrcodeAssign = '/customer/qrcode/assign';
 
@@ -122,7 +127,6 @@ class ApiEndpoints {
   static const riderOrderDeliveryUpload = '/rider/order/delivery/upload';
   static const riderScanQrcode = '/rider/scan/qrcode';
   static const riderOrderDetail = '/rider/order/detail';
-  static const riderActivityHistory = '/rider/activity/history';
   static const riderReapplyUpdate = '/rider/re-apply/update';
 
   // ---- Merchant ----
@@ -137,6 +141,5 @@ class ApiEndpoints {
   static const merchantWashComplete = '/merchant/wash/complete';
   static const merchantScanQrcode = '/merchant/scan/qrcode';
   static const merchantOrderDetail = '/merchant/order/detail';
-  static const merchantActivityHistory = '/merchant/activity/history';
   static const merchantReapplyUpdate = '/merchant/re-apply/update';
 }

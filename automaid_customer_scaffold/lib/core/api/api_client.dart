@@ -61,15 +61,13 @@ class ApiClient {
 
   /// The backend uses POST for almost every endpoint (see routes/api.php),
   /// including reads — so `post` is the primary method used throughout the app.
-  /// [data] accepts a Map (most calls) or a Dio FormData (multipart file
-  /// uploads — registration document photos, delivery proof, etc.).
-  Future<Map<String, dynamic>> post(String path, {dynamic data, Duration? timeout}) async {
+  /// `data` accepts a plain Map (most calls) or a dio FormData object
+  /// (multipart uploads, e.g. a photo alongside other fields) — dio's
+  /// own `post()` already handles both, this was just typed narrower
+  /// than necessary.
+  Future<Map<String, dynamic>> post(String path, {dynamic data}) async {
     try {
-      final response = await _dio.post(
-        path,
-        data: data,
-        options: timeout != null ? Options(sendTimeout: timeout, receiveTimeout: timeout) : null,
-      );
+      final response = await _dio.post(path, data: data);
       return _unwrap(response);
     } on DioException catch (e) {
       throw _toApiException(e);
@@ -93,22 +91,26 @@ class ApiClient {
 
   ApiException _toApiException(DioException e) {
     final data = e.response?.data;
-    String message = e.message ?? 'Network error';
+    final statusCode = e.response?.statusCode;
+    String message = statusCode == 401
+        ? 'Invalid email or password.'
+        : (e.message ?? 'Network error');
     Map<String, dynamic>? errors;
 
     if (data is Map<String, dynamic>) {
-      // Most endpoints in this backend return {'message': '...'}, but
-      // AuthController::login() specifically returns {'error':
-      // 'Unauthorized'} for bad credentials (a genuine 401, unlike
-      // everything else which uses a 200 with status:false) — without
-      // this fallback, a wrong email/password showed Dio's raw internal
-      // error text instead of a real message.
-      message = data['message']?.toString() ?? data['error']?.toString() ?? message;
+      // Most endpoints use {'message': '...'}, but login's 401 specifically
+      // returns {'error': 'Unauthorized'} (see AuthController::login) — that
+      // raw string isn't a useful thing to show someone typing their
+      // password, so keep the friendly default for 401s and only pull
+      // from the response body for everything else.
+      if (statusCode != 401) {
+        message = data['message']?.toString() ?? data['error']?.toString() ?? message;
+      }
       if (data['errors'] is Map<String, dynamic>) {
         errors = data['errors'] as Map<String, dynamic>;
       }
     }
 
-    return ApiException(message, statusCode: e.response?.statusCode, errors: errors);
+    return ApiException(message, statusCode: statusCode, errors: errors);
   }
 }
