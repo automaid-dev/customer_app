@@ -382,7 +382,7 @@ class _AddonsStep extends ConsumerWidget {
               value: isSelected,
               onChanged: (_) => onChanged(a),
               controlAffinity: ListTileControlAffinity.leading,
-              title: Text(a.name),
+              title: Text(a.title),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -575,7 +575,12 @@ class _ScheduleStep extends ConsumerWidget {
         const Divider(),
         const Text('ORDER SUMMARY', style: TextStyle(color: Colors.grey, fontSize: 12)),
         _SummaryRow('Washing charge', draft.washingCharge),
-        if (draft.addonCharge > 0) _SummaryRow('Add-on charge', draft.addonCharge),
+        // Previously every selected add-on was folded into one combined
+        // "Add-on charge" line, so the customer could see they were
+        // being charged for add-ons but never which ones or how much
+        // each cost — the same gap the email invoice never had, since
+        // that one always itemized each add-on by name.
+        for (final addon in draft.selectedAddons) _SummaryRow(addon.title, addon.price),
         if (draft.addonDiscount > 0) _SummaryRow('Add-on discount', -draft.addonDiscount),
         if (draft.insuranceSelected) _SummaryRow('Risk-Free Insurance', draft.insuranceFee),
         if (draft.voucher != null) _SummaryRow('Voucher discount', -draft.voucherDiscountAmount),
