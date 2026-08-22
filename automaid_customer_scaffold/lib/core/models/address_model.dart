@@ -32,15 +32,6 @@ class Address {
   });
 
   factory Address.fromJson(Map<String, dynamic> json) {
-    // The backend's Address model only stores state_id/country_id — the
-    // readable name comes from the eager-loaded `state`/`country`
-    // relation objects (see ProfileController::profile and
-    // AddressController::saveAddress/updateAddress, which now load
-    // these). Falling back to flat country_name/state_name keys too,
-    // in case some other response shape ever sends those directly.
-    final stateRelation = json['state'] as Map<String, dynamic>?;
-    final countryRelation = json['country'] as Map<String, dynamic>?;
-
     return Address(
       id: json['id'] as int,
       addressLine1: json['address_line_1']?.toString() ?? '',
@@ -53,8 +44,8 @@ class Address {
       block: json['block']?.toString(),
       addressLine2: json['address_line_2']?.toString(),
       addressTitle: json['address_title']?.toString(),
-      countryName: countryRelation?['name']?.toString() ?? json['country_name']?.toString(),
-      stateName: stateRelation?['name']?.toString() ?? json['state_name']?.toString(),
+      countryName: json['country_name']?.toString(),
+      stateName: json['state_name']?.toString(),
     );
   }
 
@@ -76,18 +67,4 @@ class Address {
       };
 
   String get displayLabel => addressTitle?.isNotEmpty == true ? addressTitle! : addressLine1;
-
-  /// Full readable address on one line — for places where just the label
-  /// ("Home") isn't enough to recognize which saved address this is,
-  /// e.g. a dropdown the customer hasn't looked at in a while.
-  String get fullAddressText {
-    final parts = <String>[
-      addressLine1,
-      if (addressLine2 != null && addressLine2!.isNotEmpty) addressLine2!,
-      city,
-      postcode,
-      if (stateName != null && stateName!.isNotEmpty) stateName!,
-    ];
-    return parts.where((p) => p.isNotEmpty).join(', ');
-  }
 }

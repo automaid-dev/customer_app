@@ -1,7 +1,10 @@
+import 'package:dio/dio.dart' show FormData, MultipartFile, ListFormat;
 import '../api/api_client.dart';
 import '../api/api_endpoints.dart';
 import '../api/token_storage.dart';
 import '../models/app_user.dart';
+import '../models/bank_model.dart';
+import '../models/state_model.dart';
 
 class AuthResult {
   final AppUser user;
@@ -54,41 +57,193 @@ class AuthRepository {
     return AppUser.fromJson(json);
   }
 
-  /// Step 1 of sign-up: creates the user (status PENDING, not yet active)
-  /// and triggers an OTP SMS to their phone — see AuthController::register.
-  /// No token yet; the account isn't usable until [verifyRegister] succeeds.
-  /// [mobileNo] must already be in `60XXXXXXXXX` form (country code + number,
-  /// no leading 0, no '+') — the backend validates it against
-  /// `^60\d{9,10}$` exactly.
-  /// Returns the user_id needed for [verifyRegister] / [resendOtp].
-  Future<({bool status, String message, int? userId})> register({
+  // ---- Reference data (used during registration) ----
+
+  Future<List<StateModel>> states() async {
+    final json = await _api.post(ApiEndpoints.states);
+    final list = (json['data']?['states'] as List<dynamic>? ?? []);
+    return list.map((s) => StateModel.fromJson(s as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<BankModel>> banks() async {
+    final json = await _api.post(ApiEndpoints.banks);
+    final list = (json['data']?['banks'] as List<dynamic>? ?? json['banks'] as List<dynamic>? ?? []);
+    return list.map((b) => BankModel.fromJson(b as Map<String, dynamic>)).toList();
+  }
+
+  // ---- Rider registration ----
+  // Matches RiderController::register exactly (see the field list in its
+  // Validator::make call) — country_name/state_name/city are free-text
+  // names the backend resolves to ids itself (get_country_id/get_state_id),
+  // same convention as the customer app's address fields.
+
+  Future<({bool status, String message, int? userId})> registerRider({
     required String name,
     required String email,
     required String mobileNo,
     required String password,
     required String passwordConfirmation,
-    DateTime? dob,
+    required String icno,
+    String? idType, // 'NRIC' | 'Passport' — mapped to the backend's integer code
+    required String addressLine1,
+    required String addressLine2,
+    required String countryName,
+    required String stateName,
+    required String postcode,
+    required String city,
+    required String typeRider, // 'gig' | 'staff' — see Rider::TYPE_* constants
+    required String typeVehicle,
+    required String emergencyName,
+    required String emergencyPhone,
+    required String emergencyRelation,
+    required String plateNo,
+    required String vehicleMake,
+    required String vehicleModel,
+    required double latitude,
+    required double longitude,
+    String? vehicleColor,
+    String? bankName,
+    String? bankNo,
+    // Verification documents — the backend accepts these in the same
+    // multipart request as everything else (RiderController::register),
+    // not a separate upload call. All 5 required by the flow spec (JPJ
+    // grant included — previously missing from the old app).
+    required String icFrontPath,
+    required String icBackPath,
+    required String licenseFrontPath,
+    required String licenseBackPath,
+    required String jpjGrantPath,
   }) async {
-    final json = await _api.post(ApiEndpoints.register, data: {
+    final formData = FormData.fromMap({
       'name': name,
       'email': email,
+      'country_code_mobile': '60',
       'mobile_no': mobileNo,
       'password': password,
       'password_confirmation': passwordConfirmation,
-      if (dob != null) 'dob': dob.toIso8601String().split('T').first,
+      'icno': icno,
+      if (idType != null) 'id_type': idType,
+      'address_line_1': addressLine1,
+      'address_line_2': addressLine2,
+      'country_name': countryName,
+      'state_name': stateName,
+      'postcode': postcode,
+      'city': city,
+      'type_rider': typeRider,
+      'type_vehicle': typeVehicle,
+      'emergency_name': emergencyName,
+      'country_code_emergency': '60',
+      'emergency_phone': emergencyPhone,
+      'emergency_relation': emergencyRelation,
+      'plate_no': plateNo,
+      'vehicle_make': vehicleMake,
+      'vehicle_model': vehicleModel,
+      if (vehicleColor != null) 'vehicle_color': vehicleColor,
+      if (bankName != null) 'bank_name': bankName,
+      if (bankNo != null) 'bank_no': bankNo,
+      'latitude': latitude,
+      'longitude': longitude,
+      'ic_front': await MultipartFile.fromFile(icFrontPath),
+      'ic_back': await MultipartFile.fromFile(icBackPath),
+      'license_front': await MultipartFile.fromFile(licenseFrontPath),
+      'license_back': await MultipartFile.fromFile(licenseBackPath),
+      'jpj_grant': await MultipartFile.fromFile(jpjGrantPath),
     });
+    // Longer timeout than the default 15s — this uploads up to 5 photos
+    // (IC front/back, license front/back, JPJ grant) plus all the text
+    // fields in one request. A client-side timeout here doesn't mean
+    // the server request failed — it may complete anyway, which is
+    // exactly what caused a real "email already taken, but I never got
+    // my OTP" dead end for at least one merchant registration before
+    // this was raised (same issue applies to rider — same fix here).
+    final json = await _api.post(ApiEndpoints.riderRegister, data: formData, timeout: const Duration(seconds: 60));
+    return _describeRegisterResult(json);
+  }
+
+  // ---- Merchant registration ----
+  // Matches MerchantController::register exactly.
+
+  Future<({bool status, String message, int? userId})> registerMerchant({
+    required String name,
+    required String email,
+    required String mobileNo,
+    required String password,
+    required String passwordConfirmation,
+    required String icno,
+    required String idType,
+    required String addressLine1,
+    required String addressLine2,
+    required String countryName,
+    required String stateName,
+    required String postcode,
+    required String city,
+    required String typeMerchant, // 'outlet_partner' | 'automaid_outlet'
+    required int washerQuantity,
+    required int dryerQuantity,
+    required List<String> serviceCategories,
+    required String companyName,
+    required String ssmNo,
+    required String businessOption,
+    required double latitude,
+    required double longitude,
+    String? bankName,
+    String? bankNo,
+    // Verification documents — same single-request convention as rider
+    // registration. SSM certificate is optional per the backend
+    // validation rule (image|mimes, no "required"), IC front/back always
+    // collected per the flow spec's step 3.
+    required String icFrontPath,
+    required String icBackPath,
+    String? ssmCertPath,
+  }) async {
+    final formData = FormData.fromMap({
+      'name': name,
+      'email': email,
+      'country_code_mobile': '60',
+      'mobile_no': mobileNo,
+      'password': password,
+      'password_confirmation': passwordConfirmation,
+      'icno': icno,
+      'id_type': idType,
+      'address_line_1': addressLine1,
+      'address_line_2': addressLine2,
+      'country_name': countryName,
+      'state_name': stateName,
+      'postcode': postcode,
+      'city': city,
+      'type_merchant': typeMerchant,
+      'washer_quantity': washerQuantity,
+      'dryer_quantity': dryerQuantity,
+      'service_categories': serviceCategories,
+      'company_name': companyName,
+      'ssm_no': ssmNo,
+      'business_option': businessOption,
+      if (bankName != null) 'bank_name': bankName,
+      if (bankNo != null) 'bank_no': bankNo,
+      'latitude': latitude,
+      'longitude': longitude,
+      'ic_front': await MultipartFile.fromFile(icFrontPath),
+      'ic_back': await MultipartFile.fromFile(icBackPath),
+      if (ssmCertPath != null) 'ssm_cert': await MultipartFile.fromFile(ssmCertPath),
+    }, ListFormat.multiCompatible); // service_categories needs key[]=value PHP array syntax, not Dio's default
+    // Longer timeout than the default 15s — see the matching comment on
+    // registerRider() above. This is exactly what caused the "email
+    // already taken, stuck, can't reach OTP" issue reported.
+    final json = await _api.post(ApiEndpoints.merchantRegister, data: formData, timeout: const Duration(seconds: 60));
+    return _describeRegisterResult(json);
+  }
+
+  ({bool status, String message, int? userId}) _describeRegisterResult(Map<String, dynamic> json) {
     return (
       status: json['status'] == true,
-      // The backend returns validation failures as a normal 200 response
-      // with status:false and a generic top-level `message` (e.g.
-      // "Validation error"), plus the real per-field detail in `errors`
-      // (Laravel's standard {"field": ["reason"]} shape) — flatten that
-      // into something readable rather than showing the generic text.
       message: _describeMessage(json),
       userId: json['user_id'] as int?,
     );
   }
 
+  /// Flattens Laravel's {"field": ["reason"]} error bag into a readable
+  /// multi-line message — the generic top-level `message` (e.g.
+  /// "validation error") on its own isn't useful for a 15+ field form.
   String _describeMessage(Map<String, dynamic> json) {
     final generic = json['message']?.toString() ?? '';
     final errors = json['errors'];
@@ -106,9 +261,8 @@ class AuthRepository {
     return generic;
   }
 
-  /// Resends the OTP for a not-yet-verified account (e.g. user closed the
-  /// app before entering it, or the code expired). Looks the account up by
-  /// email — see AuthController::resendOtp.
+  /// Resends the OTP for a not-yet-verified account — shared endpoint
+  /// across customer/rider/merchant (see AuthController::resendOtp).
   Future<({bool status, String message, int? userId})> resendOtp(String email) async {
     final json = await _api.post(ApiEndpoints.resendOtp, data: {'email': email});
     return (
@@ -118,18 +272,20 @@ class AuthRepository {
     );
   }
 
-  /// Step 2 of sign-up: verifies the OTP and activates the account.
-  ///
-  /// Quirk worth knowing: unlike [login], this endpoint does NOT return a
-  /// top-level `token` field — the Sanctum plaintext token is instead set
-  /// on the user row's `api_token` column and comes back embedded in the
-  /// returned `user` object (see AuthController::verifyRegister). This
-  /// method reads it from there so the caller doesn't need to know that.
-  Future<AuthResult> verifyRegister({required int userId, required String otp}) async {
-    final json = await _api.post(ApiEndpoints.registerVerify, data: {
-      'user_id': userId,
-      'token': otp,
-    });
+  /// Verifies OTP for a rider registration — see
+  /// RiderController::verifyRegisterRider. Same token-in-user-object
+  /// quirk as the customer app: no top-level `token`, it's nested in
+  /// `user.api_token`.
+  Future<AuthResult> verifyRegisterRider({required int userId, required String otp}) {
+    return _verifyRegister(ApiEndpoints.riderRegisterVerify, userId: userId, otp: otp);
+  }
+
+  Future<AuthResult> verifyRegisterMerchant({required int userId, required String otp}) {
+    return _verifyRegister(ApiEndpoints.merchantRegisterVerify, userId: userId, otp: otp);
+  }
+
+  Future<AuthResult> _verifyRegister(String endpoint, {required int userId, required String otp}) async {
+    final json = await _api.post(endpoint, data: {'user_id': userId, 'token': otp});
 
     final status = json['status'] == true;
     final userJson = json['user'] as Map<String, dynamic>?;

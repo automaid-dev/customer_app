@@ -48,7 +48,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // On success, go_router's redirect (see app_router.dart) sends the
       // user to their role's home automatically once auth state updates.
     } on ApiException catch (e) {
-      setState(() => _errorMessage = e.message);
+      // AuthController::login() returns a plain 'Unauthorized' for bad
+      // credentials — shown as something an actual user would expect.
+      final message = (e.statusCode == 401)
+          ? 'Incorrect email or password. Please try again.'
+          : e.message;
+      setState(() => _errorMessage = message);
     } catch (e) {
       setState(() => _errorMessage = 'Something went wrong. Please try again.');
     } finally {
@@ -69,16 +74,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Image.asset('assets/images/laundrybar_logo.jpeg', height: 64),
-                  const SizedBox(height: 20),
-                  Image.asset('assets/images/automaid_logo.png', height: 88),
-                  const SizedBox(height: 8),
+                  Image.asset('assets/images/automaid_logo.png', height: 100),
+                  const SizedBox(height: 12),
                   const Text(
-                    'Sign in',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                    'Team Up with Pick & Wash',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 28),
+                  const Text(
+                    'Work with us now and boost your income!',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -112,7 +119,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => context.push('/register'),
-                    child: const Text("Don't have an account? Sign up"),
+                    child: const Text("No account yet? Register now"),
                   ),
                 ],
               ),

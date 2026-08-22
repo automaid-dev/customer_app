@@ -61,6 +61,12 @@ class AppUser {
   bool get isRegistrationComplete => isActive && status != 'pending';
   bool get isRejected => status == 'rejected';
 
+  /// True once OTP is verified but before admin approves the
+  /// Rider/Merchant entity — matches the backend setting User::ONBOARDING
+  /// right after verifyRegisterRider/Merchant succeeds. The app shows a
+  /// "pending approval" screen instead of the normal dashboard for this.
+  bool get isPendingApproval => status == 'onboarding';
+
   /// A user could technically hold multiple roles; the app picks one active
   /// role at a time (persisted via TokenStorage.saveActiveRole) and routes
   /// into that role's module. Falls back to the first role present.

@@ -5,51 +5,64 @@ import 'package:go_router/go_router.dart';
 import '../auth/auth_providers.dart';
 import '../models/app_user.dart';
 import '../../features/auth/login_screen.dart';
-import '../../features/auth/register_screen.dart';
-import '../../features/customer/home/customer_home_screen.dart';
-import '../../features/onboarding/getting_started_screen.dart';
+import '../../features/auth/register_role_screen.dart';
+import '../../features/auth/pending_approval_screen.dart';
+import '../../features/rider/home/rider_home_screen.dart';
+import '../../features/merchant/home/merchant_home_screen.dart';
 
-/// Customer-app router. This app only ever serves the customer role —
-/// if a rider/merchant account somehow logs in here, they're logged back
-/// out (see redirect below) rather than shown a broken screen.
+/// Combined rider + merchant app router. A single login screen serves
+/// both roles — after auth, the redirect below sends a rider account to
+/// /rider/home and a merchant (wash outlet) account to /merchant/home,
+/// based on the Spatie role on the logged-in user. An account whose
+/// entity is still awaiting admin approval (User.status == 'onboarding')
+/// is sent to /pending instead of either dashboard.
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authControllerProvider);
 
   return GoRouter(
-    initialLocation: '/welcome',
+    initialLocation: '/login',
     refreshListenable: _AuthListenable(ref),
     redirect: (context, state) {
-      final onboarding = state.matchedLocation == '/welcome';
       final loggingIn = state.matchedLocation == '/login';
       final registering = state.matchedLocation == '/register';
-      final preAuth = onboarding || loggingIn || registering;
+      final preAuth = loggingIn || registering;
 
       if (authState.status == AuthStatus.unknown) {
         return null;
       }
 
       if (authState.status == AuthStatus.unauthenticated) {
-        return preAuth ? null : '/welcome';
+        return preAuth ? null : '/login';
       }
 
-      // authenticated — this app only supports the customer role
+      // authenticated — route by role
       final role = authState.user?.primaryRole;
-      if (role != UserRole.customer) {
-        // Wrong app for this account — force logout rather than show
-        // a screen with no data for their role.
+      if (role != UserRole.rider && role != UserRole.merchant) {
+        // Customer account trying to use the rider/merchant app.
         Future.microtask(() => ref.read(authControllerProvider.notifier).logout());
-        return '/welcome';
+        return '/login';
       }
 
-      return preAuth ? '/customer/home' : null;
+      if (authState.user?.isPendingApproval == true) {
+        return state.matchedLocation == '/pending' ? null : '/pending';
+      }
+
+      if (preAuth || state.matchedLocation == '/pending') {
+        return role == UserRole.rider ? '/rider/home' : '/merchant/home';
+      }
+      return null;
     },
     routes: [
-      GoRoute(path: '/welcome', builder: (context, state) => const GettingStartedScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+      GoRoute(path: '/register', builder: (context, state) => const RegisterRoleScreen()),
+      GoRoute(path: '/pending', builder: (context, state) => const PendingApprovalScreen()),
       GoRoute(
-        path: '/customer/home',
-        builder: (context, state) => const CustomerHomeScreen(),
+        path: '/rider/home',
+        builder: (context, state) => const RiderHomeScreen(),
+      ),
+      GoRoute(
+        path: '/merchant/home',
+        builder: (context, state) => const MerchantHomeScreen(),
       ),
     ],
   );
