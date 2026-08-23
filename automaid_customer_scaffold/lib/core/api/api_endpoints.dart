@@ -67,6 +67,7 @@ class ApiEndpoints {
   static const notificationRead = '/notification/read';
   static const notificationReadAll = '/notification/read_all';
   static const notificationDelete = '/notification/delete';
+  static const banners = '/banners';
 
   static const payment = '/payment';
 

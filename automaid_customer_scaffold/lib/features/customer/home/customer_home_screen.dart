@@ -4,6 +4,7 @@ import '../../../core/auth/auth_providers.dart';
 import '../../../core/models/booking_model.dart';
 import '../../../core/models/subscription_plan_model.dart';
 import '../../../core/widgets/dashboard_banner.dart';
+import '../../../core/widgets/promo_banner_carousel.dart';
 import '../providers/customer_providers.dart';
 import '../booking/booking_flow_screen.dart';
 import '../bag/bag_screen.dart';
@@ -63,6 +64,7 @@ class _HomeTab extends ConsumerWidget {
     final bookingsAsync = ref.watch(homeBookingsProvider);
     final notificationsAsync = ref.watch(notificationsProvider);
     final unreadCount = notificationsAsync.valueOrNull?.unreadCount ?? 0;
+    final bannersAsync = ref.watch(bannersProvider);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -86,6 +88,19 @@ class _HomeTab extends ConsumerWidget {
                     .push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
                 ref.invalidate(notificationsProvider);
               },
+            ),
+            // Admin-managed promotional banners — renders nothing if
+            // there are none configured or active, so this is a no-op
+            // visually until the admin actually sets one up.
+            bannersAsync.when(
+              data: (banners) => banners.isEmpty
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: PromoBannerCarousel(banners: banners),
+                    ),
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => const SizedBox.shrink(),
             ),
             Padding(
               padding: const EdgeInsets.all(16),

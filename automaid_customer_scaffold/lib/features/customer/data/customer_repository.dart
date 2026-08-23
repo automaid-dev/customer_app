@@ -10,6 +10,7 @@ import '../../../core/models/setting_model.dart';
 import '../../../core/models/state_model.dart';
 import '../../../core/models/subscription_plan_model.dart';
 import '../../../core/models/voucher_model.dart';
+import '../../../core/models/promo_banner_model.dart';
 
 /// Every method here maps 1:1 to a route under the `customer` prefix in
 /// routes/api.php. Kept as one repository (rather than splitting per
@@ -524,5 +525,13 @@ class CustomerRepository {
   Future<Map<String, dynamic>?> currentSubscription() async {
     final user = await profile();
     return user['subscribe'] as Map<String, dynamic>?;
+  }
+
+  // ---- Dashboard promo banners ----
+
+  Future<List<PromoBanner>> banners() async {
+    final json = await _api.post(ApiEndpoints.banners, data: {'target': 'customer'});
+    final list = (_data(json, fallback: 'Could not load banners.')['banners'] as List<dynamic>? ?? []);
+    return list.map((b) => PromoBanner.fromJson(b as Map<String, dynamic>)).toList();
   }
 }

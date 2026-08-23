@@ -5,6 +5,7 @@ import '../../../core/models/booking_model.dart';
 import '../../../core/models/setting_model.dart';
 import '../../../core/models/state_model.dart';
 import '../../../core/models/subscription_plan_model.dart';
+import '../../../core/models/promo_banner_model.dart';
 import '../data/customer_repository.dart';
 
 final customerRepositoryProvider = Provider<CustomerRepository>((ref) {
@@ -24,6 +25,11 @@ final statesProvider = FutureProvider.autoDispose<List<StateModel>>((ref) {
 /// to refresh this list.
 final homeBookingsProvider = FutureProvider.autoDispose<List<BookingSummary>>((ref) {
   return ref.read(customerRepositoryProvider).home();
+});
+
+/// Admin-managed promotional banners for the dashboard carousel.
+final bannersProvider = FutureProvider.autoDispose<List<PromoBanner>>((ref) {
+  return ref.read(customerRepositoryProvider).banners();
 });
 
 final announcementsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
