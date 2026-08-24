@@ -274,9 +274,15 @@ class CustomerRepository {
     return double.tryParse(_data(json)['total_addon_discount']?.toString() ?? '') ?? 0;
   }
 
-  Future<double> checkInsurance() async {
+  /// Fee to purchase, and coverage amount if purchased — see
+  /// Setting::insurance_fee / insurance_coverage on the backend.
+  Future<({double fee, double coverage})> checkInsurance() async {
     final json = await _api.post(ApiEndpoints.customerBookingInsuranceCheck);
-    return double.tryParse(_data(json)['insurance_fee']?.toString() ?? '') ?? 0;
+    final data = _data(json);
+    return (
+      fee: double.tryParse(data['insurance_fee']?.toString() ?? '') ?? 0,
+      coverage: double.tryParse(data['insurance_coverage']?.toString() ?? '') ?? 0,
+    );
   }
 
   /// Returns null if no birthday reward is available; otherwise the reward amount.
