@@ -91,6 +91,10 @@ class _BookingReceiptScreenState extends ConsumerState<BookingReceiptScreen> {
         MapEntry('Delivery charge', 'RM${booking!['delivery_charge']}'),
       if (booking?['discount'] != null && (double.tryParse(booking!['discount'].toString()) ?? 0) > 0)
         MapEntry('Discount', '-RM${booking['discount']}'),
+      if ((double.tryParse(order['birthday_reward']?.toString() ?? '0') ?? 0) > 0)
+        MapEntry('Birthday reward', '-RM${(double.tryParse(order['birthday_reward'].toString()) ?? 0).toStringAsFixed(2)}'),
+      if ((double.tryParse(order['insurance_fee']?.toString() ?? '0') ?? 0) > 0)
+        MapEntry('Risk-Free Insurance', 'RM${(double.tryParse(order['insurance_fee'].toString()) ?? 0).toStringAsFixed(2)}'),
       if (booking?['tax'] != null) MapEntry('SST', 'RM${booking!['tax']}'),
       MapEntry('Grand total', 'RM${order['grand_total']?.toString() ?? booking?['grand_total']?.toString() ?? '0.00'}'),
     ];
@@ -116,6 +120,10 @@ class _ReceiptBody extends ConsumerWidget {
     final grandTotal = order['grand_total']?.toString() ?? booking?['grand_total']?.toString() ?? '0.00';
     final addonCharge = double.tryParse(booking?['addon_charge']?.toString() ?? '0') ?? 0;
     final discount = double.tryParse(booking?['discount']?.toString() ?? '0') ?? 0;
+    // Both stored on the order itself, not the booking — see the
+    // add_birthday_reward_insurance_fee_orders_table migration.
+    final insuranceFee = double.tryParse(order['insurance_fee']?.toString() ?? '0') ?? 0;
+    final birthdayReward = double.tryParse(order['birthday_reward']?.toString() ?? '0') ?? 0;
 
     return Center(
       child: SingleChildScrollView(
@@ -157,6 +165,10 @@ class _ReceiptBody extends ConsumerWidget {
                   _ReceiptRow(label: 'Delivery charge', value: 'RM${booking!['delivery_charge']}'),
                 if (discount > 0)
                   _ReceiptRow(label: 'Discount', value: '-RM${booking?['discount']}'),
+                if (birthdayReward > 0)
+                  _ReceiptRow(label: 'Birthday reward', value: '-RM${birthdayReward.toStringAsFixed(2)}'),
+                if (insuranceFee > 0)
+                  _ReceiptRow(label: 'Risk-Free Insurance', value: 'RM${insuranceFee.toStringAsFixed(2)}'),
                 if (booking?['tax'] != null) _ReceiptRow(label: 'SST', value: 'RM${booking!['tax']}'),
                 const Divider(height: 32),
                 _ReceiptRow(label: 'Grand total', value: 'RM$grandTotal', emphasize: true),
