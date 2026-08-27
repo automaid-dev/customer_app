@@ -32,6 +32,12 @@ final bannersProvider = FutureProvider.autoDispose<List<PromoBanner>>((ref) {
   return ref.read(customerRepositoryProvider).banners();
 });
 
+/// This customer's own support tickets, newest first. Invalidate after
+/// filing a new one so the list screen picks it up immediately.
+final supportTicketsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+  return ref.read(customerRepositoryProvider).supportTickets();
+});
+
 final announcementsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   return ref.read(customerRepositoryProvider).announcements();
 });

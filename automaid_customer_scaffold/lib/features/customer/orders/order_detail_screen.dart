@@ -134,11 +134,11 @@ class _StatusTimeline extends StatelessWidget {
   final Map<String, dynamic> order;
 
   static const _steps = [
-    ('01', 'Waiting rider for pickup', 'Rider is on the way to pick up your laundry'),
-    ('02', 'Delivering to wash outlet', 'Rider is delivering your laundry to the washing outlet'),
-    ('03', 'Wash in progress', 'Your laundry is being washed and processed at the facility'),
-    ('04', 'Delivering to customer', 'Rider is en route to the drop off location'),
-    ('05', 'Order delivered', "Your booking is completed! We'd love to hear your feedback"),
+    ('01', 'Waiting rider for pickup', 'Rider is on the way to pick up your laundry. Have your laundry bag packed and ready'),
+    ('02', 'Delivery to wash outlet', 'Rider is delivering your laundry to outlet. Your items are safely on the move.'),
+    ('03', 'Wash in progress', 'Your laundry is being washed and processed at the facility. Care instructions are being followed.'),
+    ('04', 'Delivery to customer', 'Rider is en route to the drop facility. Ensure someone is available to receive the package.'),
+    ('05', 'Order delivered', "Your booking is completed. Rate us and we'd love to hear your feedback."),
   ];
 
   @override
@@ -172,6 +172,9 @@ class _StatusTimeline extends StatelessWidget {
         .cast<Map<String, dynamic>>();
     bool isDone(String code) =>
         statuses.any((s) => s['code']?.toString() == code && (s['is_done'] == true || s['is_done'] == 1));
+    String? doneAt(String code) => statuses
+        .firstWhere((s) => s['code']?.toString() == code, orElse: () => <String, dynamic>{})['done_at']
+        ?.toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,10 +184,26 @@ class _StatusTimeline extends StatelessWidget {
             title: _steps[i].$2,
             subtitle: _steps[i].$3,
             isDone: isDone(_steps[i].$1),
+            doneAt: _formatDate(doneAt(_steps[i].$1)),
             isLast: i == _steps.length - 1,
           ),
       ],
     );
+  }
+
+  /// Formats an ISO timestamp like "21 Aug 2026, 3:05 AM".
+  static String? _formatDate(String? iso) {
+    if (iso == null) return null;
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return null;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final period = dt.hour < 12 ? 'AM' : 'PM';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}, $hour12:$minute $period';
   }
 }
 
@@ -194,11 +213,13 @@ class _TimelineTile extends StatelessWidget {
     required this.subtitle,
     required this.isDone,
     required this.isLast,
+    this.doneAt,
   });
   final String title;
   final String subtitle;
   final bool isDone;
   final bool isLast;
+  final String? doneAt;
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +247,10 @@ class _TimelineTile extends StatelessWidget {
                 children: [
                   Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDone ? null : Colors.grey)),
                   Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  if (isDone && doneAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text('Completed on: $doneAt', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                  ],
                 ],
               ),
             ),

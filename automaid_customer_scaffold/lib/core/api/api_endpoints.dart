@@ -61,6 +61,7 @@ class ApiEndpoints {
   static const helpTicketDetail = '/help/ticket/detail';
   static const helpTicketOrderLists = '/help/ticket/order/lists';
   static const helpTicketStore = '/help/ticket/store';
+  static const helpTicketReply = '/help/ticket/reply';
 
   static const notificationIndex = '/notification/index';
   static const notificationUnread = '/notification/unread';

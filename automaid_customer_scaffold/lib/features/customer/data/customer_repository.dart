@@ -540,4 +540,61 @@ class CustomerRepository {
     final list = (_data(json, fallback: 'Could not load banners.')['banners'] as List<dynamic>? ?? []);
     return list.map((b) => PromoBanner.fromJson(b as Map<String, dynamic>)).toList();
   }
+
+  // ---- Help & Support (complaint tickets) ----
+
+  /// This customer's own past tickets, newest first.
+  Future<List<Map<String, dynamic>>> supportTickets() async {
+    final json = await _api.post(ApiEndpoints.helpTicketIndex);
+    final list = _data(json, fallback: 'Could not load tickets.')['tickets'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  /// A single ticket with its full reply thread — the chat view.
+  Future<Map<String, dynamic>> supportTicketDetail(int ticketId) async {
+    final json = await _api.post(ApiEndpoints.helpTicketDetail, data: {'ticket_id': ticketId});
+    return _data(json, fallback: 'Could not load ticket.')['ticket'] as Map<String, dynamic>;
+  }
+
+  /// Recent orders to pick from when filing a new complaint — lets the
+  /// person attach the specific order the issue relates to, rather
+  /// than typing an order number from memory.
+  Future<List<Map<String, dynamic>>> supportTicketOrders() async {
+    final json = await _api.post(ApiEndpoints.helpTicketOrderLists);
+    final list = _data(json, fallback: 'Could not load orders.')['orders'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  /// Files a new complaint/support ticket. `imagePath`, if provided, is
+  /// sent as a multipart upload (same pattern as the booking pickup
+  /// photo) — plain JSON otherwise, since the backend accepts either.
+  Future<Map<String, dynamic>> createSupportTicket({
+    int? orderId,
+    required String issueType,
+    required String issue,
+    String? imagePath,
+  }) async {
+    final json = await _api.post(
+      ApiEndpoints.helpTicketStore,
+      data: FormData.fromMap({
+        if (orderId != null) 'order_id': orderId,
+        'issue_type': issueType,
+        'issue': issue,
+        if (imagePath != null) 'image': await MultipartFile.fromFile(imagePath),
+      }),
+    );
+    return _data(json, fallback: 'Could not submit your complaint.')['ticket'] as Map<String, dynamic>;
+  }
+
+  /// Posts a new chat message on an existing ticket.
+  Future<Map<String, dynamic>> replySupportTicket({
+    required int ticketId,
+    required String description,
+  }) async {
+    final json = await _api.post(ApiEndpoints.helpTicketReply, data: {
+      'ticket_id': ticketId,
+      'description': description,
+    });
+    return _data(json, fallback: 'Could not send your reply.')['ticket'] as Map<String, dynamic>;
+  }
 }
