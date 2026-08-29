@@ -43,8 +43,12 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
   // time is known (see _applyCutoffAwareDefaultDate).
   int? _selectedAddressId;
   DateTime _pickupDate = DateTime.now().add(const Duration(days: 1));
-  TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 12, minute: 0);
+  // Bag QR-code selection removed from this flow — see the removed
+  // _ScheduleStep section below for why (not part of the physical
+  // pickup process yet). qrcodeSeriesNumbers is still sent to the
+  // backend as an empty list, which it already handles gracefully.
   final Set<String> _selectedQrcodes = {};
 
   // Mandatory pickup handoff photo + note, captured once right before
@@ -195,10 +199,6 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
   Future<void> _submit() async {
     if (_selectedAddressId == null) {
       setState(() => _error = 'Please select a pickup address.');
-      return;
-    }
-    if (_selectedQrcodes.length < _quantity) {
-      setState(() => _error = 'Please select $_quantity QR code(s) for this booking.');
       return;
     }
     if (_pickupPhotoPath == null || _pickupNote == null || _pickupNote!.trim().isEmpty) {
@@ -422,15 +422,6 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
                   onStartTimeChanged: (t) => setState(() => _startTime = t),
                   endTime: _endTime,
                   onEndTimeChanged: (t) => setState(() => _endTime = t),
-                  selectedQrcodes: _selectedQrcodes,
-                  requiredQuantity: _quantity,
-                  onQrcodeToggled: (code) => setState(() {
-                    if (_selectedQrcodes.contains(code)) {
-                      _selectedQrcodes.remove(code);
-                    } else {
-                      _selectedQrcodes.add(code);
-                    }
-                  }),
                   draft: draft,
                   error: _error,
                 ),
@@ -521,6 +512,18 @@ class _AddonsStep extends ConsumerWidget {
   }
 }
 
+/// Formats a TimeOfDay as "8:00 AM" explicitly — deliberately not using
+/// TimeOfDay.format(context), since that follows the device's 24-hour
+/// clock setting and would silently drop the AM/PM entirely for anyone
+/// with that setting on, showing a bare "09:00" with no way to tell
+/// morning from evening.
+String _formatTime(TimeOfDay t) {
+  final hour12 = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+  final minute = t.minute.toString().padLeft(2, '0');
+  final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+  return '$hour12:$minute $period';
+}
+
 class _ScheduleStep extends ConsumerWidget {
   const _ScheduleStep({
     required this.selectedAddressId,
@@ -531,9 +534,6 @@ class _ScheduleStep extends ConsumerWidget {
     required this.onStartTimeChanged,
     required this.endTime,
     required this.onEndTimeChanged,
-    required this.selectedQrcodes,
-    required this.requiredQuantity,
-    required this.onQrcodeToggled,
     required this.draft,
     required this.error,
   });
@@ -546,9 +546,6 @@ class _ScheduleStep extends ConsumerWidget {
   final ValueChanged<TimeOfDay> onStartTimeChanged;
   final TimeOfDay endTime;
   final ValueChanged<TimeOfDay> onEndTimeChanged;
-  final Set<String> selectedQrcodes;
-  final int requiredQuantity;
-  final ValueChanged<String> onQrcodeToggled;
   final BookingDraft draft;
   final String? error;
 
@@ -647,7 +644,7 @@ class _ScheduleStep extends ConsumerWidget {
             Expanded(
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text('Start: ${startTime.format(context)}'),
+                title: Text('Start: ${_formatTime(startTime)}'),
                 onTap: () async {
                   final picked = await showTimePicker(context: context, initialTime: startTime);
                   if (picked != null) onStartTimeChanged(picked);
@@ -657,7 +654,7 @@ class _ScheduleStep extends ConsumerWidget {
             Expanded(
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text('End: ${endTime.format(context)}'),
+                title: Text('End: ${_formatTime(endTime)}'),
                 onTap: () async {
                   final picked = await showTimePicker(context: context, initialTime: endTime);
                   if (picked != null) onEndTimeChanged(picked);
@@ -667,27 +664,6 @@ class _ScheduleStep extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Text('Select $requiredQuantity scanned bag QR code(s):'),
-        FutureBuilder<List<Map<String, dynamic>>>(
-          future: repo.bookingQrcodes(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-            final qrcodes = snapshot.data!;
-            if (qrcodes.isEmpty) {
-              return const Text('No scanned bags available — scan a bag first.');
-            }
-            return Column(
-              children: qrcodes.map((q) {
-                final series = q['series_no']?.toString() ?? '';
-                return CheckboxListTile(
-                  value: selectedQrcodes.contains(series),
-                  onChanged: (_) => onQrcodeToggled(series),
-                  title: Text(series),
-                );
-              }).toList(),
-            );
-          },
-        ),
         const Divider(),
         const Text('ORDER SUMMARY', style: TextStyle(color: Colors.grey, fontSize: 12)),
         _SummaryRow('Washing charge', draft.washingCharge),
