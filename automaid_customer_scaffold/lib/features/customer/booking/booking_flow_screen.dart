@@ -11,6 +11,7 @@ import '../payment/payment_flow.dart';
 import '../providers/customer_providers.dart';
 import 'booking_draft_provider.dart';
 import 'pickup_handoff_capture.dart';
+import 'waiting_list_dialog.dart';
 
 /// Booking flow, step by step:
 /// 1. Bag quantity -> calculateRate
@@ -174,6 +175,53 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
       MaterialPageRoute(builder: (_) => TermsConditionsScreen(pdfUrl: url)),
     );
     return accepted == true;
+  }
+
+  /// Called whenever the customer picks or changes their pickup
+  /// address — checks it against the service coverage area right
+  /// after applying the selection. If the address isn't covered, shows
+  /// a dialog with the two options: pick a different address (the
+  /// uncovered one stays selected so it's clear which one still needs
+  /// changing), or join the waiting list.
+  Future<void> _onAddressSelected(int id) async {
+    setState(() => _selectedAddressId = id);
+    try {
+      final covered = await ref.read(customerRepositoryProvider).checkCoverage(id);
+      if (!covered && mounted) {
+        await _showNotCoveredDialog();
+      }
+    } catch (_) {
+      // Non-fatal — if the coverage check itself fails (network, etc.),
+      // don't block the booking flow over it; worst case an
+      // out-of-area booking gets caught later by ops instead of here.
+    }
+  }
+
+  Future<void> _showNotCoveredDialog() {
+    return showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Outside service area'),
+        content: const Text(
+          'This pickup location is not in our coverage area yet. '
+          'You can enter a new pickup address, or join our waiting list '
+          "and we'll notify you as soon as we launch in your area.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Back'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              showJoinWaitingListSheet(context);
+            },
+            child: const Text('Join waiting list'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Requires a photo + note for where the laundry is being left
@@ -415,7 +463,7 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
               children: [
                 _ScheduleStep(
                   selectedAddressId: _selectedAddressId,
-                  onAddressSelected: (id) => setState(() => _selectedAddressId = id),
+                  onAddressSelected: _onAddressSelected,
                   pickupDate: _pickupDate,
                   onDateChanged: (d) => setState(() => _pickupDate = d),
                   startTime: _startTime,

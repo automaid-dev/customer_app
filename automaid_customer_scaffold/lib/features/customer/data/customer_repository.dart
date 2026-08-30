@@ -597,4 +597,31 @@ class CustomerRepository {
     });
     return _data(json, fallback: 'Could not send your reply.')['ticket'] as Map<String, dynamic>;
   }
+
+  // ---- Service coverage area ----
+
+  /// Whether a saved address is inside the service area. Backend looks
+  /// up the address's own city/state server-side, so nothing about the
+  /// address needs to be known here beyond its id.
+  Future<bool> checkCoverage(int addressId) async {
+    final json = await _api.post(ApiEndpoints.customerCoverageCheck, data: {'address_id': addressId});
+    return _data(json, fallback: 'Could not check coverage.')['covered'] == true;
+  }
+
+  /// Joins the service-expansion waiting list — offered when a pickup
+  /// address falls outside the coverage area.
+  Future<void> joinWaitingList({
+    required String name,
+    required String email,
+    required String phone,
+    required String postcode,
+  }) async {
+    final json = await _api.post(ApiEndpoints.customerCoverageWaitingList, data: {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'postcode': postcode,
+    });
+    _data(json, fallback: 'Could not join the waiting list.');
+  }
 }

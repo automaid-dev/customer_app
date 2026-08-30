@@ -82,6 +82,8 @@ class ApiEndpoints {
   static const customerAddressStore = '/customer/profile/address/store';
   static const customerAddressUpdate = '/customer/profile/address/update';
   static const customerAddressDelete = '/customer/profile/address/delete';
+  static const customerCoverageCheck = '/customer/coverage/check';
+  static const customerCoverageWaitingList = '/customer/coverage/waiting-list';
 
   static const customerBagQrcode = '/customer/profile/bag/qrcode';
   static const customerBagScan = '/customer/profile/bag/scan';
