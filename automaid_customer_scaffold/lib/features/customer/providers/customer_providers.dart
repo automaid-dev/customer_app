@@ -32,6 +32,12 @@ final bannersProvider = FutureProvider.autoDispose<List<PromoBanner>>((ref) {
   return ref.read(customerRepositoryProvider).banners();
 });
 
+/// Admin-managed onboarding carousel — shown before login, so this
+/// (unlike bannersProvider above) hits the public no-auth endpoint.
+final onboardingBannersProvider = FutureProvider.autoDispose<List<PromoBanner>>((ref) {
+  return ref.read(customerRepositoryProvider).onboardingBanners();
+});
+
 /// This customer's own support tickets, newest first. Invalidate after
 /// filing a new one so the list screen picks it up immediately.
 final supportTicketsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {

@@ -541,6 +541,15 @@ class CustomerRepository {
     return list.map((b) => PromoBanner.fromJson(b as Map<String, dynamic>)).toList();
   }
 
+  /// The onboarding carousel shown before login — hits the public,
+  /// no-auth route (see ApiEndpoints.onboardingBanners) since there's
+  /// no session yet at that point in the app.
+  Future<List<PromoBanner>> onboardingBanners() async {
+    final json = await _api.post(ApiEndpoints.onboardingBanners, data: {'target': 'onboarding'});
+    final list = (_data(json, fallback: 'Could not load banners.')['banners'] as List<dynamic>? ?? []);
+    return list.map((b) => PromoBanner.fromJson(b as Map<String, dynamic>)).toList();
+  }
+
   // ---- Help & Support (complaint tickets) ----
 
   /// This customer's own past tickets, newest first.

@@ -69,6 +69,10 @@ class ApiEndpoints {
   static const notificationReadAll = '/notification/read_all';
   static const notificationDelete = '/notification/delete';
   static const banners = '/banners';
+  // Public (no-auth) route — same underlying controller/data as
+  // `banners` above, but reachable before login for the onboarding
+  // carousel, which the authenticated route can't be.
+  static const onboardingBanners = '/onboarding/banners';
 
   static const payment = '/payment';
 

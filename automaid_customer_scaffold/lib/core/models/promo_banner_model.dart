@@ -7,16 +7,18 @@
 class PromoBanner {
   final int id;
   final String? title;
+  final String? description;
   final String imageUrl;
   final String? link;
 
-  PromoBanner({required this.id, this.title, required this.imageUrl, this.link});
+  PromoBanner({required this.id, this.title, this.description, required this.imageUrl, this.link});
 
   factory PromoBanner.fromJson(Map<String, dynamic> json) {
     final rawLink = json['link']?.toString().trim();
     return PromoBanner(
       id: json['id'] as int,
       title: json['title']?.toString(),
+      description: json['description']?.toString(),
       imageUrl: json['image_url']?.toString() ?? '',
       link: (rawLink == null || rawLink.isEmpty) ? null : rawLink,
     );
