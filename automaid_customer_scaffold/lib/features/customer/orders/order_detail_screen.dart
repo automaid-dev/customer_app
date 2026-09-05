@@ -176,6 +176,16 @@ class _StatusTimeline extends StatelessWidget {
         .firstWhere((s) => s['code']?.toString() == code, orElse: () => <String, dynamic>{})['done_at']
         ?.toString();
 
+    // The photo + note the customer themselves provided at booking
+    // time (e.g. "left at hotel lobby with reception") — shown
+    // embedded under "Waiting rider for pickup" specifically, since
+    // that's the step it's actually relevant to (before the rider has
+    // arrived to collect the bag), rather than as a separate card
+    // elsewhere on this screen.
+    final booking = order['booking'] as Map<String, dynamic>?;
+    final pickupPhotoUrl = booking?['pickup_photo_url']?.toString();
+    final pickupNote = booking?['pickup_note']?.toString();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -186,6 +196,9 @@ class _StatusTimeline extends StatelessWidget {
             isDone: isDone(_steps[i].$1),
             doneAt: _formatDate(doneAt(_steps[i].$1)),
             isLast: i == _steps.length - 1,
+            extra: _steps[i].$1 == '01' && (pickupPhotoUrl != null || (pickupNote?.isNotEmpty ?? false))
+                ? _PickupPhotoCard(imageUrl: pickupPhotoUrl, note: pickupNote)
+                : null,
           ),
       ],
     );
@@ -214,12 +227,14 @@ class _TimelineTile extends StatelessWidget {
     required this.isDone,
     required this.isLast,
     this.doneAt,
+    this.extra,
   });
   final String title;
   final String subtitle;
   final bool isDone;
   final bool isLast;
   final String? doneAt;
+  final Widget? extra;
 
   @override
   Widget build(BuildContext context) {
@@ -250,6 +265,10 @@ class _TimelineTile extends StatelessWidget {
                   if (isDone && doneAt != null) ...[
                     const SizedBox(height: 4),
                     Text('Completed on: $doneAt', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                  ],
+                  if (extra != null) ...[
+                    const SizedBox(height: 8),
+                    extra!,
                   ],
                 ],
               ),
@@ -367,6 +386,52 @@ class _RatingForm extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// The pickup handoff photo/note the customer themselves provided at
+/// booking time — embedded under the "Waiting rider for pickup" step
+/// specifically, since that's the step it's actually relevant to.
+class _PickupPhotoCard extends StatelessWidget {
+  const _PickupPhotoCard({this.imageUrl, this.note});
+  final String? imageUrl;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Your pickup photo & note',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+          ),
+          const SizedBox(height: 6),
+          if (imageUrl != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.network(
+                imageUrl!,
+                height: 140,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          if (note?.isNotEmpty ?? false) ...[
+            const SizedBox(height: 6),
+            Text(note!, style: const TextStyle(fontSize: 13)),
+          ],
+        ],
+      ),
     );
   }
 }

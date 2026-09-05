@@ -28,6 +28,16 @@ class GettingStartedScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
+              const SizedBox(height: 8),
+              // Fixed header, above the banner card — not overlaid on
+              // top of the sliding image itself, so it doesn't compete
+              // with whatever's happening in that image (previous
+              // version overlaid it inside the image and it clashed
+              // with the banner's own content).
+              Image.asset(
+                'assets/images/laundrybar_logo_transparent.png',
+                height: 72,
+              ),
               const Spacer(),
               Expanded(
                 flex: 6,
@@ -110,32 +120,11 @@ class _OnboardingCarouselState extends State<_OnboardingCarousel> {
                   Expanded(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(28),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.network(
-                            banner.imageUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (_, __, ___) => const _StaticHero(),
-                          ),
-                          // Brand logo overlaid on every slide, regardless
-                          // of whatever image admin uploads for that
-                          // banner — keeps LaundryBar branding consistent
-                          // across the carousel even if a given slide's
-                          // own image doesn't already include it.
-                          Positioned(
-                            top: 16,
-                            left: 0,
-                            right: 0,
-                            child: Center(
-                              child: Image.asset(
-                                'assets/images/laundrybar_logo_transparent.png',
-                                height: 40,
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: Image.network(
+                        banner.imageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (_, __, ___) => const _StaticHero(),
                       ),
                     ),
                   ),
