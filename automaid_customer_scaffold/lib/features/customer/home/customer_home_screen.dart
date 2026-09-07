@@ -7,6 +7,7 @@ import '../../../core/widgets/dashboard_banner.dart';
 import '../../../core/widgets/promo_banner_carousel.dart';
 import '../providers/customer_providers.dart';
 import '../booking/booking_flow_screen.dart';
+import '../booking/dry_clean_item_selection_screen.dart';
 import '../bag/bag_screen.dart';
 import '../orders/order_list_screen.dart';
 import '../subscription/subscription_screen.dart';
@@ -70,9 +71,7 @@ class _HomeTab extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('New booking'),
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const BookingFlowScreen()),
-        ),
+        onPressed: () => _showBookingTypeSheet(context),
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(homeBookingsProvider),
@@ -132,6 +131,46 @@ class _HomeTab extends ConsumerWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Two booking types, since Wash & Fold and Dry Cleaning price and
+  /// flow completely differently (per-bag vs per-piece) — this picker
+  /// keeps the single FAB rather than needing two separate buttons on
+  /// the dashboard.
+  void _showBookingTypeSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.local_laundry_service_outlined),
+              title: const Text('Wash & Fold'),
+              subtitle: const Text('Per-bag laundry pickup & delivery'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const BookingFlowScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.dry_cleaning_outlined),
+              title: const Text('Dry Cleaning'),
+              subtitle: const Text('Per-item pricing — shirts, suits, dresses & more'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DryCleanItemSelectionScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),

@@ -108,6 +108,7 @@ class ApiEndpoints {
   static const customerBookingCalculateRate = '/customer/booking/calculate/rate';
   static const customerBookingAddon = '/customer/booking/addon';
   static const customerBookingAddonList = '/customer/booking/addon/lists';
+  static const customerServiceCategoryList = '/customer/booking/service-category/lists';
   static const customerBookingVoucher = '/customer/booking/voucher';
   static const customerBookingVoucherList = '/customer/booking/voucher/lists';
   static const customerBookingQrcodes = '/customer/booking/qrcodes';

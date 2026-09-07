@@ -6,6 +6,7 @@ import '../../../core/models/address_model.dart';
 import '../../../core/models/addon_model.dart';
 import '../../../core/models/booking_model.dart';
 import '../../../core/models/notification_model.dart';
+import '../../../core/models/service_category_model.dart';
 import '../../../core/models/setting_model.dart';
 import '../../../core/models/state_model.dart';
 import '../../../core/models/subscription_plan_model.dart';
@@ -300,6 +301,22 @@ class CustomerRepository {
   /// (backend expects a JSON-encoded string of the array — see BookingController::schedule).
   /// Returns either {'booking': ...} (paid via subscription or zero total — instant)
   /// or {'url': ...} (needs payment gateway).
+  /// Active dry-cleaning categories + their items, plus this
+  /// customer's applicable subscriber discount % — everything the
+  /// item-selection screen needs in one call.
+  Future<({List<ServiceCategory> categories, double subscriberDiscountPercent, int maxItemsPerBag})> serviceCategoryList() async {
+    final json = await _api.post(ApiEndpoints.customerServiceCategoryList);
+    final data = _data(json, fallback: 'Could not load dry-cleaning catalog.');
+    final categories = (data['categories'] as List<dynamic>? ?? [])
+        .map((c) => ServiceCategory.fromJson(c as Map<String, dynamic>))
+        .toList();
+    return (
+      categories: categories,
+      subscriberDiscountPercent: double.tryParse(data['subscriber_discount_percent']?.toString() ?? '') ?? 0,
+      maxItemsPerBag: int.tryParse(data['max_items_per_bag']?.toString() ?? '') ?? 20,
+    );
+  }
+
   Future<Map<String, dynamic>> schedule({
     required int pickupLocationId,
     required DateTime pickupDate,
@@ -320,6 +337,12 @@ class CustomerRepository {
     double? insuranceFee,
     double? birthdayReward,
     bool isFolding = true,
+    // Dry-clean orders only — see BookingController::schedule's
+    // `service_category_id`/`items` branch. When present, the backend
+    // ignores pickup_bag_quantity's usual purchased/scanned-bag check
+    // entirely and prices from these items instead of washing_charge.
+    int? serviceCategoryId,
+    List<Map<String, dynamic>>? items,
   }) async {
     // FormData rather than a plain map — the pickup handoff photo is a
     // mandatory multipart file upload (see BookingController::schedule's
@@ -341,6 +364,8 @@ class CustomerRepository {
       if (addonDiscount != null) 'addon_discount': addonDiscount,
       if (insuranceFee != null) 'insurance_fee': insuranceFee,
       if (birthdayReward != null) 'birthday_reward': birthdayReward,
+      if (serviceCategoryId != null) 'service_category_id': serviceCategoryId,
+      if (items != null) 'items': jsonEncode(items),
       'is_folding': isFolding ? 1 : 0,
       'pickup_note': pickupNote,
       'pickup_photo': await MultipartFile.fromFile(pickupPhotoPath),
