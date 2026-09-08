@@ -183,6 +183,29 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     }
   }
 
+  Future<void> _confirmAndCancel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel subscription?'),
+        content: const Text(
+          "You'll lose your subscriber benefits (free bags, dry-cleaning discount) "
+          "once this takes effect. This can't be undone from here — you'd need to "
+          'subscribe again to get them back.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep subscription')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancel subscription'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _cancel();
+  }
+
   Future<void> _cancel() async {
     setState(() => _isSubmitting = true);
     try {
@@ -364,7 +387,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               if (isActive) ...[
                 const SizedBox(height: 8),
                 OutlinedButton(
-                  onPressed: _isSubmitting ? null : _cancel,
+                  onPressed: _isSubmitting ? null : _confirmAndCancel,
                   child: const Text('Cancel subscription'),
                 ),
               ],

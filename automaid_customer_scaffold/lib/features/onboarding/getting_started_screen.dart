@@ -36,7 +36,7 @@ class GettingStartedScreen extends ConsumerWidget {
               // with the banner's own content).
               Image.asset(
                 'assets/images/laundrybar_logo_transparent.png',
-                height: 72,
+                height: 100,
               ),
               const Spacer(),
               Expanded(

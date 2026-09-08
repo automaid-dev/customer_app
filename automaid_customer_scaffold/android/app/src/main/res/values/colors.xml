@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches AppColors.background in lib/core/theme/app_theme.dart —
+         the native launch screen background now blends directly into
+         GettingStartedScreen's own Scaffold background instead of
+         showing a distinct white flash first. -->
+    <color name="launch_background_color">#FFF7F9FC</color>
+</resources>

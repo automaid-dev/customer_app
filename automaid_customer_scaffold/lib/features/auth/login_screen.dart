@@ -69,9 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Image.asset('assets/images/laundrybar_logo.jpeg', height: 64),
-                  const SizedBox(height: 20),
-                  Image.asset('assets/images/automaid_logo.png', height: 88),
+                  Image.asset('assets/images/laundrybar_logo_transparent.png', height: 140),
                   const SizedBox(height: 8),
                   const Text(
                     'Sign in',
