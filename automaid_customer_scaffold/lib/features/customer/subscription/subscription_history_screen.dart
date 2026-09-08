@@ -56,6 +56,34 @@ class _SubscriptionHistoryScreenState extends ConsumerState<SubscriptionHistoryS
     }
   }
 
+  String _statusLabel(String? status) {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'pending':
+        return 'Pending';
+      case 'inactive':
+        return 'Inactive';
+      default:
+        return '-';
+    }
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'active':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      case 'pending':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,14 +109,32 @@ class _SubscriptionHistoryScreenState extends ConsumerState<SubscriptionHistoryS
                           itemBuilder: (context, i) {
                             final order = _orders![i];
                             final createdAt = order['created_at']?.toString().split('T').first;
+                            final subscriptionStatus = order['subscription_status']?.toString();
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
                                 leading: const Icon(Icons.receipt_long_outlined),
-                                title: Text(_typeLabel(order['order_type']?.toString())),
-                                subtitle: Text(
-                                  '${createdAt ?? '-'} · ${order['status'] ?? '-'}',
+                                title: Row(
+                                  children: [
+                                    Expanded(child: Text(_typeLabel(order['order_type']?.toString()))),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: _statusColor(subscriptionStatus).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        _statusLabel(subscriptionStatus),
+                                        style: TextStyle(
+                                          color: _statusColor(subscriptionStatus),
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                subtitle: Text(createdAt ?? '-'),
                                 trailing: Text(
                                   'RM${order['grand_total']?.toString() ?? '0.00'}',
                                   style: const TextStyle(fontWeight: FontWeight.bold),
