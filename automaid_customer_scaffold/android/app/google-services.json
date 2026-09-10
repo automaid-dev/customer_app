@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "434390905194",
+    "project_id": "automaid-app",
+    "storage_bucket": "automaid-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:434390905194:android:b2498b87dc6084f2c9b513",
+        "android_client_info": {
+          "package_name": "paynwash.automaid.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByDDJ9pvrKoDaJPAoPHxIZwiiWEGx5MUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:434390905194:android:edf7c1ba33de6a0cc9b513",
+        "android_client_info": {
+          "package_name": "paynwash.automaid.merchantrider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByDDJ9pvrKoDaJPAoPHxIZwiiWEGx5MUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
