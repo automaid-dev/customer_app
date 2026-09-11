@@ -121,6 +121,7 @@ class ApiEndpoints {
   static const customerOrderActive = '/customer/order/active';
   static const customerOrderUpcoming = '/customer/order/upcoming';
   static const customerOrderDetail = '/customer/order/detail';
+  static const customerOrderCancelPending = '/customer/order/cancel-pending';
   static const customerOrderRating = '/customer/order/rating';
 
   // ---- Rider ----

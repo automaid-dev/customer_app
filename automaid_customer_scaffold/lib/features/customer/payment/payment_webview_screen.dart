@@ -24,10 +24,15 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   bool _loading = true;
   bool _finished = false;
 
-  /// Matches any of the three backend webhook endpoints Fiuu might land
-  /// on after payment (return/notification/callback all live under this
-  /// same path prefix — see routes/web.php's 'webhook' group).
-  bool _isReturnUrl(String url) => url.contains('/webhook/fiuu/');
+  /// Matches any of the backend webhook endpoints either gateway might
+  /// land on after payment (return/notification/callback all live
+  /// under 'webhook' — see routes/web.php's 'webhook' group). Checking
+  /// both prefixes matters: this same screen is used for GKash
+  /// payments too since Phase 1 (Booking/Dry Cleaning/Bag Purchase can
+  /// all be routed to either gateway via the admin toggle) — only
+  /// matching '/webhook/fiuu/' meant a GKash payment would never be
+  /// detected as finished here at all.
+  bool _isReturnUrl(String url) => url.contains('/webhook/fiuu/') || url.contains('/webhook/gkash/');
 
   @override
   void initState() {

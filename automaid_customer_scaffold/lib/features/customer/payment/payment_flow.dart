@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/customer_providers.dart';
@@ -21,7 +22,20 @@ Future<bool> runPaymentFlow({
     MaterialPageRoute(builder: (_) => PaymentWebViewScreen(paymentUrl: paymentUrl)),
   );
 
-  if (completedGatewayFlow != true || !context.mounted) return false;
+  if (completedGatewayFlow != true) {
+    // The person closed the payment page (X button, or a back
+    // gesture — either way this pops something other than `true`)
+    // without ever reaching the gateway's return URL. Previously
+    // nothing told the backend this happened at all, so the order
+    // this same screen already created (needed to have a reference to
+    // hand the gateway before redirecting) was left stuck in
+    // "Pending" forever. Best-effort, fire-and-forget — see
+    // CustomerRepository.cancelPendingOrder's docblock for why this
+    // doesn't need to block on the result.
+    unawaited(ref.read(customerRepositoryProvider).cancelPendingOrder(orderId));
+    return false;
+  }
+  if (!context.mounted) return false;
 
   bool isPaid = false;
   await showDialog<void>(

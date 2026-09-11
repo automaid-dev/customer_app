@@ -394,6 +394,22 @@ class CustomerRepository {
     return _data(json, fallback: 'Could not load order.')['order'] as Map<String, dynamic>;
   }
 
+  /// Called when the customer backs out of the payment gateway page
+  /// without completing it — see PaymentWebViewScreen. Marks that
+  /// specific order cancelled immediately instead of leaving it stuck
+  /// in "Pending" forever. Deliberately swallows errors: this is a
+  /// best-effort cleanup call fired on the way out of a screen the
+  /// customer is already leaving, not something worth blocking or
+  /// showing an error dialog for if it fails — the scheduled backend
+  /// cleanup job is the safety net either way.
+  Future<void> cancelPendingOrder(int orderId) async {
+    try {
+      await _api.post(ApiEndpoints.customerOrderCancelPending, data: {'order_id': orderId});
+    } catch (_) {
+      // best-effort — see docblock above
+    }
+  }
+
   /// Every order for this customer, any status (including cancelled) —
   /// now genuinely implemented server-side. Previously a backend stub
   /// that never returned data, so the order list screen worked around
