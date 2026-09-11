@@ -186,22 +186,32 @@ class _StaticHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CustomPaint(painter: _WedgeBackgroundPainter()),
-                Center(
-                  child: Image.asset(
-                    'assets/images/automaid_logo.png',
-                    width: 160,
+        // Flexible (not a bare child) is the actual fix — without it,
+        // this Column gives the AspectRatio *unbounded* height, so
+        // AspectRatio ignores how much vertical room is actually left
+        // and always sizes the square to match the full screen width.
+        // That's exactly what silently overflowed once the logo above
+        // grew and ate into the space this panel assumed it had.
+        // Flexible lets it shrink to whatever's actually available.
+        Flexible(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CustomPaint(painter: _WedgeBackgroundPainter()),
+                  Center(
+                    child: Image.asset(
+                      'assets/images/automaid_logo.png',
+                      width: 160,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
