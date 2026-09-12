@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/models/booking_model.dart';
 import '../../../core/models/subscription_plan_model.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/dashboard_banner.dart';
 import '../../../core/widgets/promo_banner_carousel.dart';
 import '../providers/customer_providers.dart';
@@ -144,34 +145,109 @@ class _HomeTab extends ConsumerWidget {
   void _showBookingTypeSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.local_laundry_service_outlined),
-              title: const Text('Wash & Fold'),
-              subtitle: const Text('Per-bag laundry pickup & delivery'),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BookingFlowScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.dry_cleaning_outlined),
-              title: const Text('Dry Cleaning'),
-              subtitle: const Text('Per-item pricing — shirts, suits, dresses & more'),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DryCleanItemSelectionScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('What are we booking?', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              _BookingTypeOption(
+                imageAsset: 'assets/images/wash_and_fold.jpeg',
+                title: 'Wash & Fold',
+                subtitle: 'Per-bag laundry pickup & delivery',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const BookingFlowScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              _BookingTypeOption(
+                imageAsset: 'assets/images/dry_cleaning.jpg',
+                title: 'Dry Cleaning',
+                subtitle: 'Per-item pricing — shirts, suits, dresses & more',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DryCleanItemSelectionScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One tappable option in the "What are we booking?" sheet — a real
+/// photo thumbnail rather than a generic Material icon, so the two
+/// service types (per-bag vs per-item pricing) are visually
+/// distinguishable at a glance rather than reading as near-identical
+/// laundry-icon list rows.
+class _BookingTypeOption extends StatelessWidget {
+  const _BookingTypeOption({
+    required this.imageAsset,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String imageAsset;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.background,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.asset(
+                  imageAsset,
+                  width: 68,
+                  height: 68,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey[500]),
+            ],
+          ),
         ),
       ),
     );
