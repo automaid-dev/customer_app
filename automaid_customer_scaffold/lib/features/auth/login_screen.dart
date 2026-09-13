@@ -76,6 +76,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Welcome back! Great to see you again.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 28),
                   TextFormField(
                     controller: _emailController,

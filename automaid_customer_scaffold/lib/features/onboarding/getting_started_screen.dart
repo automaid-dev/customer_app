@@ -53,8 +53,16 @@ class GettingStartedScreen extends ConsumerWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
+                  onPressed: () => context.go('/register'),
+                  child: const Text('Create account'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
                   onPressed: () => context.go('/login'),
-                  child: const Text('Get started'),
+                  child: const Text('Log in'),
                 ),
               ),
               const SizedBox(height: 8),

@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../auth/auth_providers.dart';
 import '../models/app_user.dart';
 import '../../features/auth/login_screen.dart';
-import '../../features/auth/register_screen.dart';
+import '../../features/auth/register_consent_screen.dart';
 import '../../features/customer/home/customer_home_screen.dart';
 import '../../features/onboarding/getting_started_screen.dart';
 
@@ -46,7 +46,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/welcome', builder: (context, state) => const GettingStartedScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+      GoRoute(path: '/register', builder: (context, state) => const RegisterConsentScreen()),
       GoRoute(
         path: '/customer/home',
         builder: (context, state) => const CustomerHomeScreen(),
