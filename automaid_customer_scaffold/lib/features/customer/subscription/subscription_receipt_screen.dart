@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/models/setting_model.dart';
 import '../providers/customer_providers.dart';
 import '../payment/receipt_pdf.dart';
+import '../../../core/widgets/error_state_view.dart';
 
 String _receiptTitle(String? orderType) {
   switch (orderType) {
@@ -75,7 +76,7 @@ class _SubscriptionReceiptScreenState extends ConsumerState<SubscriptionReceiptS
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorStateView(message: _error!, onRetry: _load)
               : _ReceiptBody(order: _order!),
     );
   }

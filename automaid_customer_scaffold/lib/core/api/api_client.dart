@@ -10,8 +10,15 @@ class ApiException implements Exception {
 
   ApiException(this.message, {this.statusCode, this.errors});
 
+  // Deliberately just the message, not the usual debug-style
+  // "ApiException(401): ..." — this app interpolates caught
+  // exceptions directly into user-facing text in several places
+  // (`Text('Could not load X: $e')`), so toString() IS the user-facing
+  // text in practice, not a debug log. statusCode/message are still
+  // available as named properties for anywhere that genuinely wants
+  // the fuller detail.
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() => message;
 }
 
 /// Called when a 401 comes back — lets the app force logout / redirect to login
@@ -90,11 +97,45 @@ class ApiClient {
   }
 
   ApiException _toApiException(DioException e) {
+    // Connection-level failures (no internet / DNS failure / timeout)
+    // never reach a server response at all — e.response is null for
+    // all of these. Previously this fell straight through to Dio's
+    // own raw internal message ("The connection errored: Failed host
+    // lookup: 'app.automaid.asia'. This indicates an error which most
+    // likely cannot be solved by the library."), which is meaningless
+    // to an actual person and was showing up verbatim as the error
+    // text on screens across the app. Handled first, before touching
+    // e.response at all, so this applies everywhere a request can
+    // fail this way — not just one screen.
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return ApiException(
+          "This is taking longer than expected. Please check your connection and try again.",
+        );
+      case DioExceptionType.connectionError:
+        return ApiException(
+          "Couldn't connect. Please check your internet connection and try again.",
+        );
+      case DioExceptionType.badCertificate:
+        return ApiException("Couldn't establish a secure connection. Please try again.");
+      case DioExceptionType.cancel:
+        return ApiException('Request was cancelled.');
+      case DioExceptionType.badResponse:
+      case DioExceptionType.unknown:
+      default:
+        break; // server did respond (or this is truly unexpected) — fall through below
+    }
+
     final data = e.response?.data;
     final statusCode = e.response?.statusCode;
+    // Same reasoning as above for the fallback here: if the server
+    // response has no parseable message, showing Dio's raw exception
+    // text is still not something a person should ever see.
     String message = statusCode == 401
         ? 'Invalid email or password.'
-        : (e.message ?? 'Network error');
+        : 'Something went wrong. Please try again.';
     Map<String, dynamic>? errors;
 
     if (data is Map<String, dynamic>) {

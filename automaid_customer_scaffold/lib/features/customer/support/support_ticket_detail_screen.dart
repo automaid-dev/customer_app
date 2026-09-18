@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../providers/customer_providers.dart';
+import '../../../core/widgets/error_state_view.dart';
 
 /// Chat-style thread for a single complaint — the original issue (plus
 /// its photo, if any) shown as the first message, followed by every
@@ -113,7 +114,7 @@ class _SupportTicketDetailScreenState extends ConsumerState<SupportTicketDetailS
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorStateView(message: _error!, onRetry: _load)
               : Column(
                   children: [
                     Expanded(

@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/models/setting_model.dart';
 import '../providers/customer_providers.dart';
 import '../payment/receipt_pdf.dart';
+import '../../../core/widgets/error_state_view.dart';
 
 /// A simple receipt view for a bag-purchase order — reuses the same
 /// `orderDetail` endpoint the Orders screens use (an Order row is an
@@ -62,7 +63,7 @@ class _BagReceiptScreenState extends ConsumerState<BagReceiptScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorStateView(message: _error!, onRetry: _load)
               : _ReceiptBody(order: _order!),
     );
   }

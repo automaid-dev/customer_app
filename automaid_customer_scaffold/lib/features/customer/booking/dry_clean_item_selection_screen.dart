@@ -5,6 +5,7 @@ import '../../../core/models/service_category_model.dart';
 import '../providers/customer_providers.dart';
 import 'dry_clean_draft_provider.dart';
 import 'dry_clean_checkout_screen.dart';
+import '../../../core/widgets/error_state_view.dart';
 
 /// Entry point for the dry-cleaning booking flow — fetches the active
 /// catalog (POST /customer/booking/service-category/lists), lets the
@@ -72,7 +73,7 @@ class _DryCleanItemSelectionScreenState extends ConsumerState<DryCleanItemSelect
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!, textAlign: TextAlign.center))
+              ? ErrorStateView(message: _error!, onRetry: _load)
               : category == null || category.items.isEmpty
                   ? const Center(child: Text('No dry-cleaning items available right now.'))
                   : Column(

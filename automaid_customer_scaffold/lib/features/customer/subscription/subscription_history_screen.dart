@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../providers/customer_providers.dart';
 import 'subscription_receipt_screen.dart';
+import '../../../core/widgets/error_state_view.dart';
 
 /// Lists every subscription-related order (initial subscribe, renewals,
 /// card updates, upgrades) — wraps POST /customer/subscription/history.
@@ -91,7 +92,7 @@ class _SubscriptionHistoryScreenState extends ConsumerState<SubscriptionHistoryS
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorStateView(message: _error!, onRetry: _load)
               : RefreshIndicator(
                   onRefresh: _load,
                   child: (_orders?.isEmpty ?? true)
