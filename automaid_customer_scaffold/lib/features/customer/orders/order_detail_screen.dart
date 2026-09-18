@@ -145,6 +145,46 @@ class _StatusTimeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final orderStatus = order['status']?.toString().toLowerCase();
     if (orderStatus == 'cancelled' || orderStatus == 'cancel') {
+      // A refunded order is still just Order.status = 'cancelled' —
+      // refund is tracked entirely on the payment record, so it has to
+      // be checked separately here rather than being its own order
+      // status. Without this, a customer looking at a refunded order
+      // saw the exact same "cancelled, contact support" banner as one
+      // that was never refunded at all — the push notification sent at
+      // refund time was the only place this was ever visible before.
+      final payment = order['payment'] as Map<String, dynamic>?;
+      final isRefunded = payment != null && (payment['is_refunded'] == true || payment['is_refunded'] == 1);
+
+      if (isRefunded) {
+        final refundAmount = payment['refund_amount']?.toString();
+        final refundedAt = payment['refunded_at']?.toString().split('T').first;
+        return Card(
+          color: Colors.green.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.replay_circle_filled_outlined, color: Colors.green),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Order cancelled — refund processed', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'RM${refundAmount ?? '0.00'} has been refunded'
+                        '${refundedAt != null ? ' on $refundedAt' : ''}. '
+                        "It'll be credited back to your original payment method.",
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
       return Card(
         color: Colors.red.withValues(alpha: 0.08),
         child: Padding(
