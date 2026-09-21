@@ -148,6 +148,26 @@ class _ReceiptBody extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
+                // order['delivered'] is only ever present (non-null)
+                // once OrderComplete exists for this order — same check
+                // used for the refund/cancelled banner on the order
+                // detail screen, and the admin's own status pill.
+                if (order['delivered'] != null) ...[
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Delivered',
+                        style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ],
                 const Divider(height: 32),
                 _ReceiptRow(label: 'Order #', value: '${order['id'] ?? '-'}'),
                 if (order['series_no'] != null)
