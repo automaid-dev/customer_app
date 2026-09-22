@@ -401,11 +401,47 @@ class _BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Presence of service_category_id on the nested order == dry-clean,
+    // same convention used throughout the backend and app to
+    // distinguish the two order types. `order` is already eager-loaded
+    // by HomeController::home (order.order_addons.addon), so no backend
+    // change was needed for this.
+    // service_category_id is only ever saved to Booking/OrderBooking,
+    // never to the Order record itself (no such column exists on
+    // `orders` at all) — checking booking.order's service_category_id
+    // was wrong; items presence directly on the booking itself is the
+    // reliable, already-proven-elsewhere signal (see EditOrder's own
+    // "Dry Cleaning Items" section, which uses this exact same check).
+    final isDryClean = booking.raw['items'] != null;
+    final typeLabel = isDryClean ? 'Dry Cleaning' : 'Wash & Fold';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: const Icon(Icons.local_laundry_service),
-        title: Text('Order #${booking.orderId} — ${booking.pickupBagQuantity} bag(s)'),
+        leading: Icon(isDryClean ? Icons.dry_cleaning : Icons.local_laundry_service),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                isDryClean
+                    ? 'Order #${booking.orderId}'
+                    : 'Order #${booking.orderId} — ${booking.pickupBagQuantity} bag(s)',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                typeLabel,
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
         subtitle: Text(
           booking.pickupDate != null
               ? 'RM${booking.grandTotal.toStringAsFixed(2)} · Pickup: ${booking.pickupDate!.toLocal().toString().split(' ').first} '

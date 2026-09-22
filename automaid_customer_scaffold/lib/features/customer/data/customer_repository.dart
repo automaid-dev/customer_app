@@ -242,8 +242,15 @@ class CustomerRepository {
     );
   }
 
-  Future<List<AddOn>> addOnList() async {
-    final json = await _api.post(ApiEndpoints.customerBookingAddonList);
+  /// [forDryCleaning] tells the backend which applicable_to filter to
+  /// use (AddOn.applicableTo) — it only checks whether this field is
+  /// present at all, matching the exact same convention BookingController::schedule()
+  /// already uses to distinguish dry-cleaning from Wash & Fold bookings.
+  Future<List<AddOn>> addOnList({bool forDryCleaning = false}) async {
+    final json = await _api.post(
+      ApiEndpoints.customerBookingAddonList,
+      data: forDryCleaning ? {'service_category_id': true} : null,
+    );
     return (_data(json)['addons'] as List<dynamic>? ?? [])
         .map((a) => AddOn.fromJson(a as Map<String, dynamic>))
         .toList();
@@ -365,7 +372,7 @@ class CustomerRepository {
       if (insuranceFee != null) 'insurance_fee': insuranceFee,
       if (birthdayReward != null) 'birthday_reward': birthdayReward,
       if (serviceCategoryId != null) 'service_category_id': serviceCategoryId,
-      if (items != null) 'items': jsonEncode(items),
+      if (items != null) 'items': items,
       'is_folding': isFolding ? 1 : 0,
       'pickup_note': pickupNote,
       'pickup_photo': await MultipartFile.fromFile(pickupPhotoPath),

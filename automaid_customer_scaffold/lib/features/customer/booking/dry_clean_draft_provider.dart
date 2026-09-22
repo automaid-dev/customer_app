@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/service_category_model.dart';
+import '../../../core/models/addon_model.dart';
+import '../../../core/models/voucher_model.dart';
 import '../providers/customer_providers.dart';
 
 /// Accumulates state across the dry-cleaning booking flow: item catalog
@@ -14,6 +16,14 @@ class DryCleanDraft {
   final double subscriberDiscountPercent;
   final int maxItemsPerBag;
   final double deliveryCharge;
+  // How many physical bags the items are packed into — dry-clean
+  // pricing is per-piece, not per-bag, so this isn't used for pricing
+  // the items themselves. It's still sent as pickup_bag_quantity
+  // though, since BookingController::schedule() uses that same field
+  // to calculate delivery_charge regardless of order type, and it
+  // doubles as a remark for the rider on how many bags to expect at
+  // pickup.
+  final int bagQuantity;
   final double sstPercent;
   final int? pickupLocationId;
   final DateTime? pickupDate;
@@ -21,6 +31,16 @@ class DryCleanDraft {
   final String? pickupEndTime;
   final String? pickupPhotoPath;
   final String? pickupNote;
+  // Add-ons, insurance, and voucher — same fields/semantics as
+  // BookingDraft, added here so dry-cleaning bookings support the same
+  // extras as Wash & Fold. Add-ons shown here are filtered server-side
+  // (AddOn.applicable_to) to only those the admin marked available for
+  // dry cleaning specifically, or "both".
+  final List<AddOn> selectedAddons;
+  final double addonDiscount;
+  final bool insuranceSelected;
+  final double insuranceFee;
+  final Voucher? voucher;
 
   const DryCleanDraft({
     this.serviceCategoryId,
@@ -28,6 +48,7 @@ class DryCleanDraft {
     this.subscriberDiscountPercent = 0,
     this.maxItemsPerBag = 20,
     this.deliveryCharge = 0,
+    this.bagQuantity = 1,
     this.sstPercent = 0,
     this.pickupLocationId,
     this.pickupDate,
@@ -35,6 +56,11 @@ class DryCleanDraft {
     this.pickupEndTime,
     this.pickupPhotoPath,
     this.pickupNote,
+    this.selectedAddons = const [],
+    this.addonDiscount = 0,
+    this.insuranceSelected = false,
+    this.insuranceFee = 0,
+    this.voucher,
   });
 
   int get totalQuantity => cart.values.fold(0, (sum, qty) => sum + qty);
@@ -46,9 +72,39 @@ class DryCleanDraft {
 
   double get itemsTotal => subtotal - discountAmount;
 
+  double get addonCharge => selectedAddons.fold(0.0, (sum, a) => sum + a.price);
+
+  /// Mirrors BookingDraft's voucher math exactly — flat RM amount or a
+  /// percentage of (itemsTotal + deliveryCharge), the dry-clean
+  /// equivalent of (washingCharge + deliveryCharge).
+  double get voucherDiscountAmount {
+    if (voucher == null) return 0;
+    if (voucher!.discountAmount != null) return voucher!.discountAmount!;
+    if (voucher!.discountPercent != null) {
+      return (itemsTotal + deliveryCharge) * voucher!.discountPercent! / 100;
+    }
+    return 0;
+  }
+
+  // Matches BookingController::schedule()'s actual tax formula exactly
+  // — (washing/items + delivery) * sst_percent, addon_charge is NOT
+  // part of it there (even though the separate calculateRate() preview
+  // endpoint does include addon_charge in its own tax figure — a
+  // pre-existing inconsistency between the two server-side formulas,
+  // not something introduced here). This matches what schedule() will
+  // actually charge, which matters more than matching the other
+  // preview endpoint's different formula.
   double get taxCharge => (itemsTotal + deliveryCharge) * (sstPercent / 100);
 
-  double get grandTotal => itemsTotal + deliveryCharge + taxCharge;
+  /// Mirrors BookingController::schedule's grand_total formula, dry-clean
+  /// version: (items + delivery + addon + tax) - (voucher + addonDiscount) + insurance.
+  double get grandTotal {
+    final insurance = insuranceSelected ? insuranceFee : 0;
+    final total = (itemsTotal + deliveryCharge + addonCharge + taxCharge) -
+        (voucherDiscountAmount + addonDiscount) +
+        insurance;
+    return total < 0 ? 0 : total;
+  }
 
   bool get isOverLimit => totalQuantity > maxItemsPerBag;
 
@@ -60,6 +116,7 @@ class DryCleanDraft {
     double? subscriberDiscountPercent,
     int? maxItemsPerBag,
     double? deliveryCharge,
+    int? bagQuantity,
     double? sstPercent,
     int? pickupLocationId,
     DateTime? pickupDate,
@@ -67,6 +124,12 @@ class DryCleanDraft {
     String? pickupEndTime,
     String? pickupPhotoPath,
     String? pickupNote,
+    List<AddOn>? selectedAddons,
+    double? addonDiscount,
+    bool? insuranceSelected,
+    double? insuranceFee,
+    Voucher? voucher,
+    bool clearVoucher = false,
   }) {
     return DryCleanDraft(
       serviceCategoryId: serviceCategoryId ?? this.serviceCategoryId,
@@ -74,6 +137,7 @@ class DryCleanDraft {
       subscriberDiscountPercent: subscriberDiscountPercent ?? this.subscriberDiscountPercent,
       maxItemsPerBag: maxItemsPerBag ?? this.maxItemsPerBag,
       deliveryCharge: deliveryCharge ?? this.deliveryCharge,
+      bagQuantity: bagQuantity ?? this.bagQuantity,
       sstPercent: sstPercent ?? this.sstPercent,
       pickupLocationId: pickupLocationId ?? this.pickupLocationId,
       pickupDate: pickupDate ?? this.pickupDate,
@@ -81,6 +145,11 @@ class DryCleanDraft {
       pickupEndTime: pickupEndTime ?? this.pickupEndTime,
       pickupPhotoPath: pickupPhotoPath ?? this.pickupPhotoPath,
       pickupNote: pickupNote ?? this.pickupNote,
+      selectedAddons: selectedAddons ?? this.selectedAddons,
+      addonDiscount: addonDiscount ?? this.addonDiscount,
+      insuranceSelected: insuranceSelected ?? this.insuranceSelected,
+      insuranceFee: insuranceFee ?? this.insuranceFee,
+      voucher: clearVoucher ? null : (voucher ?? this.voucher),
     );
   }
 }
@@ -141,6 +210,53 @@ class DryCleanDraftNotifier extends Notifier<DryCleanDraft> {
     state = state.copyWith(pickupPhotoPath: photoPath, pickupNote: note);
   }
 
+  // Add-ons, insurance, voucher — identical logic to
+  // BookingDraftNotifier's equivalents, kept as separate methods here
+  // (rather than sharing code) so this provider doesn't depend on
+  // changes to the Wash & Fold one, and vice versa.
+
+  void setBagQuantity(int quantity) {
+    if (quantity < 1) return;
+    state = state.copyWith(bagQuantity: quantity);
+  }
+
+  void toggleAddon(AddOn addon) {
+    final list = [...state.selectedAddons];
+    if (list.any((a) => a.id == addon.id)) {
+      list.removeWhere((a) => a.id == addon.id);
+    } else {
+      list.add(addon);
+    }
+    state = state.copyWith(selectedAddons: list);
+  }
+
+  Future<void> refreshAddonDiscount() async {
+    if (state.addonCharge <= 0) {
+      state = state.copyWith(addonDiscount: 0);
+      return;
+    }
+    final discount = await ref.read(customerRepositoryProvider).checkAddonDiscount(state.addonCharge);
+    state = state.copyWith(addonDiscount: discount);
+  }
+
+  Future<void> toggleInsurance(bool selected) async {
+    if (selected && state.insuranceFee == 0) {
+      final result = await ref.read(customerRepositoryProvider).checkInsurance();
+      state = state.copyWith(insuranceSelected: selected, insuranceFee: result.fee);
+    } else {
+      state = state.copyWith(insuranceSelected: selected);
+    }
+  }
+
+  Future<String?> applyVoucher(String code) async {
+    final voucher = await ref.read(customerRepositoryProvider).checkVoucher(code);
+    if (voucher == null) return 'Voucher is invalid, inactive, or already used.';
+    state = state.copyWith(voucher: voucher);
+    return null;
+  }
+
+  void removeVoucher() => state = state.copyWith(clearVoucher: true);
+
   /// Submits the dry-clean booking. Returns the raw `data` payload —
   /// check for a `booking` key (instant confirmation) vs a `url` key
   /// (needs payment), same shape as the Wash & Fold flow.
@@ -165,7 +281,7 @@ class DryCleanDraftNotifier extends Notifier<DryCleanDraft> {
     final result = await ref.read(customerRepositoryProvider).schedule(
           pickupLocationId: s.pickupLocationId!,
           pickupDate: s.pickupDate!,
-          pickupBagQuantity: 1,
+          pickupBagQuantity: s.bagQuantity,
           pickupStartTime: s.pickupStartTime ?? '09:00',
           pickupEndTime: s.pickupEndTime ?? '12:00',
           deliveryCharge: s.deliveryCharge,
@@ -177,6 +293,11 @@ class DryCleanDraftNotifier extends Notifier<DryCleanDraft> {
           items: s.cart.entries
               .map((e) => {'service_item_id': e.key.id, 'quantity': e.value})
               .toList(),
+          voucherCode: s.voucher?.code,
+          addonIds: s.selectedAddons.map((a) => a.id).toList(),
+          addonCharge: s.addonCharge,
+          addonDiscount: s.addonDiscount,
+          insuranceFee: s.insuranceSelected ? s.insuranceFee : null,
         );
     reset();
     ref.invalidate(currentSubscriptionProvider);

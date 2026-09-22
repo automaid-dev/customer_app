@@ -165,7 +165,7 @@ class _DryCleanItemSelectionScreenState extends ConsumerState<DryCleanItemSelect
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                ElevatedButton(
+                                FilledButton(
                                   onPressed: (draft.isEmpty || draft.isOverLimit)
                                       ? null
                                       : () => Navigator.of(context).push(
