@@ -9,17 +9,18 @@ import '../../../core/widgets/promo_banner_carousel.dart';
 import '../providers/customer_providers.dart';
 import '../booking/booking_flow_screen.dart';
 import '../booking/dry_clean_item_selection_screen.dart';
-import '../bag/bag_screen.dart';
 import '../orders/order_list_screen.dart';
 import '../subscription/subscription_screen.dart';
-import '../subscription/subscription_history_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/customer_profile_screen.dart';
 
-/// Bottom-nav shell for the whole customer app — Home / Bag / Booking /
-/// Transaction history / Profile, each its own self-contained tab (kept
-/// alive via IndexedStack so switching tabs doesn't lose scroll position
-/// or re-fetch data every time).
+/// Bottom-nav shell for the whole customer app — Home / Booking /
+/// Subscription / Profile, each its own self-contained tab (kept alive
+/// via IndexedStack so switching tabs doesn't lose scroll position or
+/// re-fetch data every time). Bag is deliberately not one of these
+/// tabs in this version — deactivated due to difficulties implementing
+/// bag QR scanning with riders and merchants; planned for a future
+/// update, not removed for good.
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
 
@@ -32,9 +33,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   static const _tabs = [
     _HomeTab(),
-    BagScreen(),
     OrderListScreen(),
-    SubscriptionHistoryScreen(),
+    SubscriptionScreen(),
     CustomerProfileScreen(),
   ];
 
@@ -47,9 +47,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.shopping_bag_outlined), selectedIcon: Icon(Icons.shopping_bag), label: 'Bag'),
           NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Booking'),
-          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'History'),
+          NavigationDestination(icon: Icon(Icons.subscriptions_outlined), selectedIcon: Icon(Icons.subscriptions), label: 'Subscription'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
