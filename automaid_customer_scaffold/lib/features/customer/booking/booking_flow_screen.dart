@@ -215,7 +215,20 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
           FilledButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
-              showJoinWaitingListSheet(context);
+              // Look up the postcode from the address just found
+              // uncovered, so the waiting-list form can pre-fill it —
+              // addressListProvider's already-resolved list is used
+              // directly rather than re-fetching, since it was just
+              // loaded to populate the address picker itself.
+              final addresses = ref.read(addressListProvider).value ?? [];
+              String? postcode;
+              for (final a in addresses) {
+                if (a.id == _selectedAddressId) {
+                  postcode = a.postcode;
+                  break;
+                }
+              }
+              showJoinWaitingListSheet(context, initialPostcode: postcode);
             },
             child: const Text('Join waiting list'),
           ),

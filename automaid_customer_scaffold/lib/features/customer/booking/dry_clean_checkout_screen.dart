@@ -134,7 +134,19 @@ class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen>
           FilledButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
-              showJoinWaitingListSheet(context);
+              // Same reasoning as the normal booking flow's equivalent
+              // — look up the postcode from the address just found
+              // uncovered, using the already-resolved address list
+              // rather than re-fetching.
+              final addresses = ref.read(addressListProvider).value ?? [];
+              String? postcode;
+              for (final a in addresses) {
+                if (a.id == _selectedAddressId) {
+                  postcode = a.postcode;
+                  break;
+                }
+              }
+              showJoinWaitingListSheet(context, initialPostcode: postcode);
             },
             child: const Text('Join waiting list'),
           ),

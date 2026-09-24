@@ -5,17 +5,21 @@ import '../providers/customer_providers.dart';
 
 /// Shown from the "not covered" dialog when a pickup address falls
 /// outside the service area — collects contact details so admin can
-/// reach out once coverage expands to that area.
-Future<void> showJoinWaitingListSheet(BuildContext context) {
+/// reach out once coverage expands to that area. Name/email/phone are
+/// pre-filled from the customer's own profile, and postcode from
+/// whichever address was just found to be uncovered, so the customer
+/// can submit with a single tap rather than re-typing anything.
+Future<void> showJoinWaitingListSheet(BuildContext context, {String? initialPostcode}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => const _WaitingListForm(),
+    builder: (context) => _WaitingListForm(initialPostcode: initialPostcode),
   );
 }
 
 class _WaitingListForm extends ConsumerStatefulWidget {
-  const _WaitingListForm();
+  const _WaitingListForm({this.initialPostcode});
+  final String? initialPostcode;
 
   @override
   ConsumerState<_WaitingListForm> createState() => _WaitingListFormState();
@@ -29,7 +33,33 @@ class _WaitingListFormState extends ConsumerState<_WaitingListForm> {
   final _postcodeController = TextEditingController();
   bool _isSubmitting = false;
   bool _submitted = false;
+  bool _isLoadingProfile = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _postcodeController.text = widget.initialPostcode ?? '';
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await ref.read(customerRepositoryProvider).profile();
+      if (!mounted) return;
+      setState(() {
+        _nameController.text = profile['name']?.toString() ?? '';
+        _emailController.text = profile['email']?.toString() ?? '';
+        _phoneController.text = profile['mobile_no']?.toString() ?? '';
+      });
+    } catch (_) {
+      // Non-fatal — same reasoning as everywhere else this pattern is
+      // used: if pre-fill fails (network, etc.), the customer can
+      // still fill the form in manually rather than being blocked.
+    } finally {
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -148,8 +178,8 @@ class _WaitingListFormState extends ConsumerState<_WaitingListForm> {
           ],
           const SizedBox(height: 20),
           FilledButton(
-            onPressed: _isSubmitting ? null : _submit,
-            child: _isSubmitting
+            onPressed: (_isSubmitting || _isLoadingProfile) ? null : _submit,
+            child: (_isSubmitting || _isLoadingProfile)
                 ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Text('Join waiting list'),
           ),
