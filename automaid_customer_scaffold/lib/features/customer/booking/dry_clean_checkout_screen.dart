@@ -21,6 +21,7 @@ class DryCleanCheckoutScreen extends ConsumerStatefulWidget {
 }
 
 class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen> {
+  int _step = 0;
   int? _selectedAddressId;
   // null = not yet checked (e.g. addresses still loading), true =
   // confirmed within coverage, false = confirmed NOT covered. Confirm
@@ -248,177 +249,94 @@ class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen>
     final addressesAsync = ref.watch(addressListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Schedule pickup')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Items (${draft.totalQuantity})', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            for (final entry in draft.cart.entries)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('${entry.value} × ${entry.key.name}'),
-                    Text('RM${(entry.key.pricePerPiece * entry.value).toStringAsFixed(2)}'),
-                  ],
-                ),
+      appBar: AppBar(title: const Text('New dry-cleaning booking')),
+      body: Stepper(
+        currentStep: _step,
+        onStepContinue: () async {
+          if (_step < 4) {
+            setState(() => _step++);
+          } else {
+            await _submit();
+          }
+        },
+        onStepCancel: () => setState(() => _step = _step > 0 ? _step - 1 : 0),
+        controlsBuilder: (context, details) => Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Row(
+            children: [
+              FilledButton(
+                onPressed: (_isSubmitting || (_step == 4 && _isAddressCovered == false))
+                    ? null
+                    : details.onStepContinue,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text(_step == 4 ? 'Confirm booking' : 'Next'),
               ),
-            const Divider(height: 24),
-            // Dry-clean pricing is per-piece, not per-bag — this isn't
-            // for pricing. It's sent as pickup_bag_quantity though,
-            // since BookingController::schedule() uses that same field
-            // to calculate delivery_charge for every order type, and it
-            // doubles as a remark telling the rider how many bags to
-            // expect at pickup.
-            Row(
-              children: [
-                Text('Number of bags', style: Theme.of(context).textTheme.titleMedium),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: draft.bagQuantity > 1
-                      ? () => ref.read(dryCleanDraftProvider.notifier).setBagQuantity(draft.bagQuantity - 1)
-                      : null,
-                ),
-                Text('${draft.bagQuantity}', style: const TextStyle(fontSize: 18)),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  onPressed: () => ref.read(dryCleanDraftProvider.notifier).setBagQuantity(draft.bagQuantity + 1),
-                ),
+              if (_step > 0) ...[
+                const SizedBox(width: 8),
+                TextButton(onPressed: details.onStepCancel, child: const Text('Back')),
               ],
-            ),
-            Text(
-              'How many bags your items are packed into — helps the rider at pickup.',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-            const Divider(height: 24),
-            addressesAsync.when(
-              data: (addresses) {
-                if (_selectedAddressId == null && addresses.isNotEmpty) {
-                  WidgetsBinding.instance
-                      .addPostFrameCallback((_) => _onAddressSelected(addresses.first.id));
-                }
-                if (addresses.isEmpty) {
-                  return TextButton.icon(
-                    icon: const Icon(Icons.add),
-                    onPressed: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const AddressListScreen()))
-                        .then((_) => ref.invalidate(addressListProvider)),
-                    label: const Text('Add a pickup address first'),
-                  );
-                }
-                Address? selected;
-                for (final a in addresses) {
-                  if (a.id == _selectedAddressId) selected = a;
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+            ],
+          ),
+        ),
+        steps: [
+          Step(
+            title: const Text('Bags'),
+            isActive: _step >= 0,
+            state: _step > 0 ? StepState.complete : StepState.indexed,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Items (${draft.totalQuantity})', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                for (final entry in draft.cart.entries)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            value: _selectedAddressId,
-                            isExpanded: true,
-                            decoration: const InputDecoration(labelText: 'Pickup address'),
-                            items: addresses
-                                .map((a) => DropdownMenuItem(
-                                      value: a.id,
-                                      child: Text('${a.displayLabel} — ${a.fullAddressText}',
-                                          overflow: TextOverflow.ellipsis),
-                                    ))
-                                .toList(),
-                            onChanged: (v) => v != null ? _onAddressSelected(v) : null,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline),
-                          tooltip: 'Add new address',
-                          onPressed: () => Navigator.of(context)
-                              .push(MaterialPageRoute(builder: (_) => const AddressFormScreen()))
-                              .then((_) => ref.invalidate(addressListProvider)),
-                        ),
+                        Text('${entry.value} × ${entry.key.name}'),
+                        Text('RM${(entry.key.pricePerPiece * entry.value).toStringAsFixed(2)}'),
                       ],
                     ),
-                    if (selected != null) ...[
-                      const SizedBox(height: 8),
-                      AddressPreviewCard(address: selected),
-                    ],
+                  ),
+                const SizedBox(height: 12),
+                // Dry-clean pricing is per-piece, not per-bag — this isn't
+                // for pricing. It's sent as pickup_bag_quantity though,
+                // since BookingController::schedule() uses that same field
+                // to calculate delivery_charge for every order type, and it
+                // doubles as a remark telling the rider how many bags to
+                // expect at pickup.
+                Row(
+                  children: [
+                    const Text('Number of bags'),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: draft.bagQuantity > 1
+                          ? () => ref.read(dryCleanDraftProvider.notifier).setBagQuantity(draft.bagQuantity - 1)
+                          : null,
+                    ),
+                    Text('${draft.bagQuantity}', style: const TextStyle(fontSize: 18)),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline),
+                      onPressed: () => ref.read(dryCleanDraftProvider.notifier).setBagQuantity(draft.bagQuantity + 1),
+                    ),
                   ],
-                );
-              },
-              loading: () => const CircularProgressIndicator(),
-              error: (e, _) => Text('Could not load addresses: $e'),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('Pickup date: ${_pickupDate.toLocal().toString().split(' ').first}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final today = DateTime.now();
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _pickupDate,
-                  firstDate: DateTime(today.year, today.month, today.day),
-                  lastDate: DateTime.now().add(const Duration(days: 60)),
-                );
-                if (picked != null) setState(() => _pickupDate = picked);
-              },
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('Start: ${_formatTime(_startTime)}'),
-                    onTap: () async {
-                      final picked = await showTimePicker(context: context, initialTime: _startTime);
-                      if (picked != null) setState(() => _startTime = picked);
-                    },
-                  ),
                 ),
-                Expanded(
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('End: ${_formatTime(_endTime)}'),
-                    onTap: () async {
-                      final picked = await showTimePicker(context: context, initialTime: _endTime);
-                      if (picked != null) setState(() => _endTime = picked);
-                    },
-                  ),
+                Text(
+                  'How many bags your items are packed into — helps the rider at pickup.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                _pickupPhotoPath != null ? Icons.check_circle : Icons.camera_alt_outlined,
-                color: _pickupPhotoPath != null ? Colors.green : null,
-              ),
-              title: Text(_pickupPhotoPath != null ? 'Pickup photo & note added' : 'Add pickup photo & note'),
-              subtitle: _pickupPhotoPath != null ? Text(_pickupNote ?? '') : const Text('Required before confirming'),
-              trailing: Text(_pickupPhotoPath != null ? 'Edit' : 'Add'),
-              onTap: () async {
-                final result = await showPickupHandoffCapture(context);
-                if (result != null) {
-                  setState(() {
-                    _pickupPhotoPath = result.photoPath;
-                    _pickupNote = result.note;
-                  });
-                }
-              },
-            ),
-            const Divider(height: 24),
-            Text('Add-ons', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            FutureBuilder<List<AddOn>>(
+          ),
+          Step(
+            title: const Text('Add-ons'),
+            isActive: _step >= 1,
+            state: _step > 1 ? StepState.complete : StepState.indexed,
+            content: FutureBuilder<List<AddOn>>(
               future: ref.read(customerRepositoryProvider).addOnList(forDryCleaning: true),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
@@ -460,8 +378,12 @@ class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen>
                 );
               },
             ),
-            const Divider(height: 24),
-            CheckboxListTile(
+          ),
+          Step(
+            title: const Text('Insurance'),
+            isActive: _step >= 2,
+            state: _step > 2 ? StepState.complete : StepState.indexed,
+            content: CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
               value: draft.insuranceSelected,
@@ -475,63 +397,191 @@ class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen>
                     : 'Optional — protects your laundry against loss or damage',
               ),
             ),
-            const Divider(height: 24),
-            Text('Voucher', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Row(
+          ),
+          Step(
+            title: const Text('Voucher'),
+            isActive: _step >= 3,
+            state: _step > 3 ? StepState.complete : StepState.indexed,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _voucherController,
-                    decoration: const InputDecoration(labelText: 'Voucher code'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _voucherController,
+                        decoration: const InputDecoration(labelText: 'Voucher code'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(onPressed: _applyVoucher, child: const Text('Apply')),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                FilledButton(onPressed: _applyVoucher, child: const Text('Apply')),
+                if (draft.voucher != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Chip(
+                      label: Text('Applied: ${draft.voucher!.code}'),
+                      onDeleted: () => ref.read(dryCleanDraftProvider.notifier).removeVoucher(),
+                    ),
+                  ),
               ],
             ),
-            if (draft.voucher != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Chip(
-                  label: Text('Applied: ${draft.voucher!.code}'),
-                  onDeleted: () => ref.read(dryCleanDraftProvider.notifier).removeVoucher(),
+          ),
+          Step(
+            title: const Text('Schedule'),
+            isActive: _step >= 4,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                addressesAsync.when(
+                  data: (addresses) {
+                    if (_selectedAddressId == null && addresses.isNotEmpty) {
+                      WidgetsBinding.instance
+                          .addPostFrameCallback((_) => _onAddressSelected(addresses.first.id));
+                    }
+                    if (addresses.isEmpty) {
+                      return TextButton.icon(
+                        icon: const Icon(Icons.add),
+                        onPressed: () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const AddressListScreen()))
+                            .then((_) => ref.invalidate(addressListProvider)),
+                        label: const Text('Add a pickup address first'),
+                      );
+                    }
+                    Address? selected;
+                    for (final a in addresses) {
+                      if (a.id == _selectedAddressId) selected = a;
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                value: _selectedAddressId,
+                                isExpanded: true,
+                                decoration: const InputDecoration(labelText: 'Pickup address'),
+                                items: addresses
+                                    .map((a) => DropdownMenuItem(
+                                          value: a.id,
+                                          child: Text('${a.displayLabel} — ${a.fullAddressText}',
+                                              overflow: TextOverflow.ellipsis),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) => v != null ? _onAddressSelected(v) : null,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              tooltip: 'Add new address',
+                              onPressed: () => Navigator.of(context)
+                                  .push(MaterialPageRoute(builder: (_) => const AddressFormScreen()))
+                                  .then((_) => ref.invalidate(addressListProvider)),
+                            ),
+                          ],
+                        ),
+                        if (selected != null) ...[
+                          const SizedBox(height: 8),
+                          AddressPreviewCard(address: selected),
+                        ],
+                      ],
+                    );
+                  },
+                  loading: () => const CircularProgressIndicator(),
+                  error: (e, _) => Text('Could not load addresses: $e'),
                 ),
-              ),
-            const Divider(height: 24),
-            const Text('ORDER SUMMARY', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            _SummaryRow('Items subtotal', draft.subtotal),
-            if (draft.discountAmount > 0)
-              _SummaryRow('Subscriber discount (${draft.subscriberDiscountPercent.toStringAsFixed(0)}%)', -draft.discountAmount),
-            if (draft.addonCharge > 0) _SummaryRow('Add-ons', draft.addonCharge),
-            if (draft.addonDiscount > 0) _SummaryRow('Add-on discount', -draft.addonDiscount),
-            _SummaryRow('Delivery charge', draft.deliveryCharge),
-            if (draft.sstPercent > 0) _SummaryRow('SST (${draft.sstPercent.toStringAsFixed(0)}%)', draft.taxCharge),
-            if (draft.insuranceSelected) _SummaryRow('Risk-Free Insurance', draft.insuranceFee),
-            if (draft.voucher != null) _SummaryRow('Voucher discount', -draft.voucherDiscountAmount),
-            const Divider(),
-            Text('Grand total: RM${draft.grandTotal.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            ],
-            if (_isAddressCovered == false) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'This address is outside our service area. Please choose a different pickup address to continue.',
-                style: TextStyle(color: Colors.red, fontSize: 12.5),
-              ),
-            ],
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: (_isSubmitting || _isAddressCovered == false) ? null : _submit,
-              child: _isSubmitting
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Confirm booking'),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('Pickup date: ${_pickupDate.toLocal().toString().split(' ').first}'),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final today = DateTime.now();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _pickupDate,
+                      firstDate: DateTime(today.year, today.month, today.day),
+                      lastDate: DateTime.now().add(const Duration(days: 60)),
+                    );
+                    if (picked != null) setState(() => _pickupDate = picked);
+                  },
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Start: ${_formatTime(_startTime)}'),
+                        onTap: () async {
+                          final picked = await showTimePicker(context: context, initialTime: _startTime);
+                          if (picked != null) setState(() => _startTime = picked);
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('End: ${_formatTime(_endTime)}'),
+                        onTap: () async {
+                          final picked = await showTimePicker(context: context, initialTime: _endTime);
+                          if (picked != null) setState(() => _endTime = picked);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    _pickupPhotoPath != null ? Icons.check_circle : Icons.camera_alt_outlined,
+                    color: _pickupPhotoPath != null ? Colors.green : null,
+                  ),
+                  title: Text(_pickupPhotoPath != null ? 'Pickup photo & note added' : 'Add pickup photo & note'),
+                  subtitle: _pickupPhotoPath != null ? Text(_pickupNote ?? '') : const Text('Required before confirming'),
+                  trailing: Text(_pickupPhotoPath != null ? 'Edit' : 'Add'),
+                  onTap: () async {
+                    final result = await showPickupHandoffCapture(context);
+                    if (result != null) {
+                      setState(() {
+                        _pickupPhotoPath = result.photoPath;
+                        _pickupNote = result.note;
+                      });
+                    }
+                  },
+                ),
+                const Divider(height: 24),
+                const Text('ORDER SUMMARY', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                _SummaryRow('Items subtotal', draft.subtotal),
+                if (draft.discountAmount > 0)
+                  _SummaryRow('Subscriber discount (${draft.subscriberDiscountPercent.toStringAsFixed(0)}%)', -draft.discountAmount),
+                if (draft.addonCharge > 0) _SummaryRow('Add-ons', draft.addonCharge),
+                if (draft.addonDiscount > 0) _SummaryRow('Add-on discount', -draft.addonDiscount),
+                _SummaryRow('Delivery charge', draft.deliveryCharge),
+                if (draft.sstPercent > 0) _SummaryRow('SST (${draft.sstPercent.toStringAsFixed(0)}%)', draft.taxCharge),
+                if (draft.insuranceSelected) _SummaryRow('Risk-Free Insurance', draft.insuranceFee),
+                if (draft.voucher != null) _SummaryRow('Voucher discount', -draft.voucherDiscountAmount),
+                const Divider(),
+                Text('Grand total: RM${draft.grandTotal.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_error!, style: const TextStyle(color: Colors.red)),
+                ],
+                if (_isAddressCovered == false) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'This address is outside our service area. Please choose a different pickup address to continue.',
+                    style: TextStyle(color: Colors.red, fontSize: 12.5),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
