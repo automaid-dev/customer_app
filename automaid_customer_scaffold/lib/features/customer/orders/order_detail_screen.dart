@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../providers/customer_providers.dart';
 import 'booking_receipt_screen.dart';
+import 'order_display.dart';
 import '../../../core/widgets/error_state_view.dart';
+import '../../../core/widgets/whatsapp_contacts.dart';
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen({super.key, required this.orderId});
@@ -102,10 +104,30 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    Text('Type: ${_order?['order_type'] ?? '-'}'),
+                    Text('Type: ${orderTypeLabel(_order!)}'),
                     Text('Status: ${_order?['status'] ?? '-'}'),
                     Text('Quantity: ${_order?['quantity'] ?? '-'}'),
                     Text('Grand total: RM${_order?['grand_total'] ?? '0.00'}'),
+                    if (_order?['order_type'] == 'booking') ...[
+                      const SizedBox(height: 12),
+                      OrderAddressBlock(
+                        icon: Icons.home_outlined,
+                        label: 'Customer address',
+                        address: customerAddressOf(_order!),
+                      ),
+                      OrderAddressBlock(
+                        icon: Icons.storefront_outlined,
+                        label: 'Merchant address',
+                        name: _order?['merchant_name']?.toString(),
+                        address: merchantAddressOf(_order!),
+                        emptyText: 'Outlet not assigned yet',
+                      ),
+                    ],
+                    // Rider (while the order is active) + AutoMaid support.
+                    if ((_order?['contacts'] as List<dynamic>? ?? const []).isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      WhatsAppContacts(contacts: _order?['contacts'] as List<dynamic>?),
+                    ],
                     const Divider(height: 32),
                     if (_order?['order_type'] == 'booking') ...[
                       const Text('ORDER STATUS', style: TextStyle(color: Colors.grey, fontSize: 12)),

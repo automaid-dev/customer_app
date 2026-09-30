@@ -33,6 +33,10 @@ Future<Uint8List> buildReceiptPdf({
   required List<MapEntry<String, String>> rows,
   String? footerNote,
   ReceiptLetterhead? letterhead,
+  /// Optional label/address pairs shown after the rows (e.g. customer
+  /// and merchant address after Grand total). Rendered as label on top,
+  /// wrapped text below, since addresses are too long for a row.
+  List<MapEntry<String, String>> addresses = const [],
 }) async {
   final doc = pw.Document();
 
@@ -71,6 +75,21 @@ Future<Uint8List> buildReceiptPdf({
                 ],
               ),
             ),
+          if (addresses.isNotEmpty) ...[
+            pw.SizedBox(height: 8),
+            pw.Divider(),
+            for (final a in addresses)
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(a.key, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                    pw.Text(a.value, style: const pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+              ),
+          ],
           if (footerNote != null) ...[
             pw.SizedBox(height: 16),
             pw.Divider(),

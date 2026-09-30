@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/models/setting_model.dart';
 import '../providers/customer_providers.dart';
 import '../payment/receipt_pdf.dart';
+import 'order_display.dart';
 import '../../../core/widgets/error_state_view.dart';
 
 /// Downloadable receipt for a booking (laundry pickup/delivery) order —
@@ -80,6 +81,7 @@ class _BookingReceiptScreenState extends ConsumerState<BookingReceiptScreen> {
     final rows = <MapEntry<String, String>>[
       MapEntry('Order #', '${order['id'] ?? '-'}'),
       if (order['series_no'] != null) MapEntry('Reference', order['series_no'].toString()),
+      MapEntry('Type', orderTypeLabel(order)),
       if (booking?['pickup_date'] != null) MapEntry('Pickup date', booking!['pickup_date'].toString()),
       if (booking?['pickup_bag_quantity'] != null)
         MapEntry('Bag quantity', '${booking!['pickup_bag_quantity']}'),
@@ -99,9 +101,21 @@ class _BookingReceiptScreenState extends ConsumerState<BookingReceiptScreen> {
       if (booking?['tax'] != null) MapEntry('SST', 'RM${booking!['tax']}'),
       MapEntry('Grand total', 'RM${order['grand_total']?.toString() ?? booking?['grand_total']?.toString() ?? '0.00'}'),
     ];
+    final merchantName = order['merchant_name']?.toString();
+    final merchantAddress = merchantAddressOf(order);
+    final addresses = <MapEntry<String, String>>[
+      MapEntry('Customer address', customerAddressOf(order) ?? '-'),
+      MapEntry(
+        'Merchant address',
+        merchantAddress == null
+            ? 'Outlet not assigned yet'
+            : [if (merchantName != null && merchantName.isNotEmpty) merchantName, merchantAddress].join('\n'),
+      ),
+    ];
     final bytes = await buildReceiptPdf(
       title: 'Booking Receipt',
       rows: rows,
+      addresses: addresses,
       footerNote: 'Thank you for using Automaid.',
       letterhead: letterhead,
     );
@@ -172,6 +186,7 @@ class _ReceiptBody extends ConsumerWidget {
                 _ReceiptRow(label: 'Order #', value: '${order['id'] ?? '-'}'),
                 if (order['series_no'] != null)
                   _ReceiptRow(label: 'Reference', value: order['series_no'].toString()),
+                _ReceiptRow(label: 'Type', value: orderTypeLabel(order)),
                 if (booking?['pickup_date'] != null)
                   _ReceiptRow(label: 'Pickup date', value: booking!['pickup_date'].toString()),
                 if (booking?['pickup_bag_quantity'] != null)
@@ -193,6 +208,19 @@ class _ReceiptBody extends ConsumerWidget {
                 if (booking?['tax'] != null) _ReceiptRow(label: 'SST', value: 'RM${booking!['tax']}'),
                 const Divider(height: 32),
                 _ReceiptRow(label: 'Grand total', value: 'RM$grandTotal', emphasize: true),
+                const Divider(height: 32),
+                OrderAddressBlock(
+                  icon: Icons.home_outlined,
+                  label: 'Customer address',
+                  address: customerAddressOf(order),
+                ),
+                OrderAddressBlock(
+                  icon: Icons.storefront_outlined,
+                  label: 'Merchant address',
+                  name: order['merchant_name']?.toString(),
+                  address: merchantAddressOf(order),
+                  emptyText: 'Outlet not assigned yet',
+                ),
               ],
             ),
           ),
