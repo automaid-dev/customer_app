@@ -3,6 +3,7 @@ import '../api/api_client.dart';
 import '../api/token_storage.dart';
 import '../models/app_user.dart';
 import 'auth_repository.dart';
+import '../push/push_service.dart';
 
 /// Change this to your deployed backend URL (the one currently reachable
 /// at http://56.69.76.60 in this project). Move to --dart-define for
@@ -24,11 +25,21 @@ class AuthState {
 }
 
 class AuthController extends StateNotifier<AuthState> {
-  AuthController(this._repo) : super(const AuthState.unknown()) {
+  AuthController(this._repo, this._api) : super(const AuthState.unknown()) {
+    // Register this phone for push whenever someone is signed in (login,
+    // restored session, finished registration), unregister on sign-out.
+    addListener((s) {
+      if (s.status == AuthStatus.authenticated && s.user != null) {
+        PushService.instance.onSignedIn(_api, s.user!.id);
+      } else if (s.status == AuthStatus.unauthenticated) {
+        PushService.instance.onSignedOut();
+      }
+    }, fireImmediately: false);
     _restoreSession();
   }
 
   final AuthRepository _repo;
+  final ApiClient _api;
 
   Future<void> _restoreSession() async {
     final token = await TokenStorage.instance.readToken();
@@ -124,5 +135,5 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final StateNotifierProvider<AuthController, AuthState> authControllerProvider =
     StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController(ref.read(authRepositoryProvider));
+  return AuthController(ref.read(authRepositoryProvider), ref.read(apiClientProvider));
 });

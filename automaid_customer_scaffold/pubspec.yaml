@@ -1,5 +1,5 @@
 name: automaid_customer
-description: LB Pickup & Delivery — customer app for laundry pickup, wash, and delivery.
+description: Automaid — customer app for laundry pickup, wash, and delivery.
 publish_to: 'none'
 version: 1.0.0+7
 
@@ -30,6 +30,10 @@ dependencies:
   # Photo capture (booking instructions, profile avatar)
   image_picker: ^1.1.2
   url_launcher: ^6.3.1
+
+  # Push notifications: Firebase (FCM) + OneSignal
+  firebase_core: ^4.15.0
+  onesignal_flutter: ^5.7.0
 
   # Map location picker (sign-up address confirmation)
   google_maps_flutter: ^2.9.0
