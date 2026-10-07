@@ -4,6 +4,7 @@ import '../../../core/auth/auth_providers.dart';
 import '../address/address_list_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../support/help_support_screen.dart';
+import '../legal/terms_policies_screen.dart';
 
 class CustomerProfileScreen extends ConsumerWidget {
   const CustomerProfileScreen({super.key});
@@ -62,6 +63,13 @@ class CustomerProfileScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context)
                 .push(MaterialPageRoute(builder: (_) => const SubscriptionScreen())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.gavel_outlined),
+            title: const Text('Terms & Policies'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const TermsPoliciesScreen())),
           ),
           ListTile(
             leading: const Icon(Icons.support_agent_outlined),

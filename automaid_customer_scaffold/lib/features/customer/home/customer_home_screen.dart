@@ -13,6 +13,7 @@ import '../orders/order_list_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/customer_profile_screen.dart';
+import '../../../core/legal_info.dart';
 
 /// Bottom-nav shell for the whole customer app — Home / Booking /
 /// Subscription / Profile, each its own self-contained tab (kept alive
@@ -76,7 +77,11 @@ class _HomeTab extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(homeBookingsProvider),
         child: ListView(
-          padding: EdgeInsets.zero,
+          // Always scrollable (and pull-to-refresh) even when the
+          // content is shorter than the screen; bottom padding keeps the
+          // footer clear of the "New booking" button.
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 96),
           children: [
             DashboardBanner(
               name: user?.name ?? '',
@@ -131,6 +136,7 @@ class _HomeTab extends ConsumerWidget {
                 ],
               ),
             ),
+            const _DashboardFooter(),
           ],
         ),
       ),
@@ -451,6 +457,58 @@ class _BookingCard extends StatelessWidget {
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => OrderListScreen(highlightOrderId: booking.orderId)),
         ),
+      ),
+    );
+  }
+}
+
+/// Company / contact footer at the bottom of the dashboard.
+class _DashboardFooter extends StatelessWidget {
+  const _DashboardFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.5);
+    final link = TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary, height: 1.5);
+    final year = DateTime.now().year;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      padding: const EdgeInsets.only(top: 16),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade300))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            children: [
+              InkWell(onTap: () => LegalInfo.openUrl(context, LegalInfo.privacyPolicyUrl), child: Text('Privacy Policy', style: link)),
+              InkWell(onTap: () => LegalInfo.openUrl(context, LegalInfo.termsOfServiceUrl), child: Text('Terms of Service', style: link)),
+              InkWell(onTap: () => LegalInfo.openUrl(context, LegalInfo.refundPolicyUrl), child: Text('Refund Policy', style: link)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '© $year ${LegalInfo.serviceProvider}\n'
+            'and ${LegalInfo.paymentProvider}.\nAll rights reserved.',
+            textAlign: TextAlign.center,
+            style: muted,
+          ),
+          const SizedBox(height: 6),
+          Text(LegalInfo.address, textAlign: TextAlign.center, style: muted),
+          const SizedBox(height: 6),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 6,
+            children: [
+              Text('Email:', style: muted),
+              InkWell(onTap: LegalInfo.emailSupport, child: Text(LegalInfo.supportEmail, style: link)),
+              Text('·  Hotline:', style: muted),
+              InkWell(onTap: LegalInfo.callHotline, child: Text(LegalInfo.hotline, style: link)),
+            ],
+          ),
+        ],
       ),
     );
   }
