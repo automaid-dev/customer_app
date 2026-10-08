@@ -1,9 +1,24 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     // Reads android/app/google-services.json (Firebase project automaid-app).
     id("com.google.gms.google-services")
+}
+
+// Release signing with the Play upload key. android/key.properties is NOT
+// committed (see android/.gitignore) — create it on the build machine:
+//   storePassword=...
+//   keyPassword=...
+//   keyAlias=upload
+//   storeFile=/absolute/path/to/upload-keystore.jks
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
 
 android {
@@ -27,11 +42,27 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
+            storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as String?
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Signed with the Play upload key when android/key.properties
+            // exists. Without it (e.g. a dev machine), falls back to the
+            // debug key so `flutter run --release` still works — Play
+            // rejects debug-signed uploads, so nothing wrong can ship.
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.warn("WARNING: android/key.properties not found — release build signed with DEBUG key (not uploadable to Play).")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
