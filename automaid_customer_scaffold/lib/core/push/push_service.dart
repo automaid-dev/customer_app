@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
@@ -31,7 +33,12 @@ class PushService {
     try {
       // Uses android/app/google-services.json via the Google Services
       // Gradle plugin — no firebase_options.dart needed on Android.
-      await Firebase.initializeApp();
+      // Firebase is only used for FCM delivery on Android. On iOS,
+      // OneSignal delivers through Apple's APNs directly, so no
+      // GoogleService-Info.plist is needed.
+      if (Platform.isAndroid) {
+        await Firebase.initializeApp();
+      }
       OneSignal.initialize(kOneSignalAppId);
 
       // The subscription ID can arrive (or change) after login — e.g.

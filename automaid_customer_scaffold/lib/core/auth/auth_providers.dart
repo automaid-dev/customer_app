@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
+import '../api/api_endpoints.dart';
 import '../api/token_storage.dart';
 import '../models/app_user.dart';
 import 'auth_repository.dart';
@@ -112,6 +113,22 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _repo.logout();
+    state = const AuthState.unauthenticated();
+  }
+
+  /// Permanently deletes the signed-in account (POST /profile/delete-account).
+  /// Throws [ApiException] with the server's message if it's refused
+  /// (wrong password, booking/job still in progress). On success the
+  /// session is cleared and the router goes back to the login screen.
+  Future<void> deleteAccount({required String password, String? reason}) async {
+    final res = await _api.post(ApiEndpoints.profileDeleteAccount, data: {
+      'password': password,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    });
+    if (res['status'] != true) {
+      throw ApiException(res['message']?.toString() ?? 'Could not delete your account.');
+    }
+    await TokenStorage.instance.clear();
     state = const AuthState.unauthenticated();
   }
 

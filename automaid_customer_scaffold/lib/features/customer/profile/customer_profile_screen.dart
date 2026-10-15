@@ -5,6 +5,7 @@ import '../address/address_list_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../support/help_support_screen.dart';
 import '../legal/terms_policies_screen.dart';
+import '../../../core/widgets/delete_account_screen.dart';
 
 class CustomerProfileScreen extends ConsumerWidget {
   const CustomerProfileScreen({super.key});
@@ -84,6 +85,13 @@ class CustomerProfileScreen extends ConsumerWidget {
             title: const Text('Log out', style: TextStyle(color: Colors.red)),
             onTap: () => _confirmLogout(context, ref),
           ),
+          ListTile(
+            leading: Icon(Icons.person_remove_outlined, color: Colors.grey[600]),
+            title: Text('Delete account', style: TextStyle(color: Colors.grey[700])),
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const DeleteAccountScreen())),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );

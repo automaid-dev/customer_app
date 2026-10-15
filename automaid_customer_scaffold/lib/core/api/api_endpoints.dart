@@ -41,6 +41,7 @@ class ApiEndpoints {
   // ---- Authenticated (shared across all roles) ----
   static const profileSaveDevice = '/profile/device';
   static const profileLogout = '/profile/logout';
+  static const profileDeleteAccount = '/profile/delete-account';
   static const profileMe = '/profile/me';
   static const profileToken = '/profile/token';
   static const profileIAgree = '/profile/iagree';
