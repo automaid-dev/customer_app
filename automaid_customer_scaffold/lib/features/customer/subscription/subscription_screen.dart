@@ -18,10 +18,12 @@ import '../../../core/utils/service_charge.dart';
 /// Two modes, based on whether the customer already has an active plan:
 /// - **No active subscription**: pick any plan, subscribe normally.
 /// - **Active subscription**: current plan is shown with usage this
-///   cycle; other plans show as "Upgrade" (only for strictly higher-priced
-///   tiers — downgrades aren't supported) with the topup amount the
-///   backend will actually charge (the price difference, not the full
-///   new-plan price — that applies automatically from the next renewal).
+///   cycle. Higher-priced plans show "Upgrade" with the price difference
+///   charged now (saved card for GKash / Revenue Monster, checkout for
+///   Fiuu); the full new price applies from the next renewal.
+///   Lower-priced plans show "Switch at renewal": nothing is charged and
+///   the lower plan + price start on the next renewal date. A scheduled
+///   switch shows a banner with a "Keep current plan" button.
 ///
 /// Plan prices/quotas are fetched live from POST /subscription/plans —
 /// never hardcoded — so this screen always reflects whatever the admin
@@ -107,25 +109,80 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     }
   }
 
+  bool get _usesSavedCard {
+    final gw = ref.read(currentSubscriptionProvider).valueOrNull?['payment_gateway']?.toString().toLowerCase();
+    return gw == 'gkash' || gw == 'revenuemonster';
+  }
+
   Future<void> _confirmAndUpgrade(SubscriptionPlan targetPlan, double topup) async {
     final pct = ref.read(appSettingProvider).valueOrNull?.serviceChargeSubscription ?? 0;
     final charge = serviceChargeFor(topup, pct);
+    final savedCard = _usesSavedCard;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Upgrade to ${targetPlan.name}?'),
         content: Text(
-          "You'll pay RM${(topup + charge).toStringAsFixed(2)} now (the difference from your current "
+          "${savedCard ? 'Your saved card will be charged' : "You'll pay"} RM${(topup + charge).toStringAsFixed(2)} now (the difference from your current "
           'plan${charge > 0 ? ' of RM${topup.toStringAsFixed(2)}, plus RM${charge.toStringAsFixed(2)} ${kServiceChargeLabel.toLowerCase()}' : ''}). '
-          'Your next renewal will bill the full ${targetPlan.name} price going forward.',
+          'Your new plan starts straight away, and your next renewal will bill the full ${targetPlan.name} price.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Upgrade')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(savedCard ? 'Pay & upgrade' : 'Upgrade'),
+          ),
         ],
       ),
     );
     if (confirmed == true) await _upgrade(targetPlan);
+  }
+
+  String _formatDate(String? ymd) {
+    final d = ymd == null ? null : DateTime.tryParse(ymd);
+    if (d == null) return 'your next renewal';
+    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${d.day} ${m[d.month - 1]} ${d.year}';
+  }
+
+  Future<void> _confirmAndDowngrade(SubscriptionPlan targetPlan, SubscriptionPlan currentPlan) async {
+    final renew = _formatDate(ref.read(currentSubscriptionProvider).valueOrNull?['end_date']?.toString());
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Switch to ${targetPlan.name}?'),
+        content: Text(
+          "Nothing is charged now. You keep ${currentPlan.name} until $renew, then your plan changes to "
+          '${targetPlan.name} and renews at RM${targetPlan.price.toStringAsFixed(2)}/month. '
+          'You can change your mind any time before then.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Switch at renewal')),
+        ],
+      ),
+    );
+    if (confirmed == true) await _upgrade(targetPlan);
+  }
+
+  Future<void> _keepCurrentPlan() async {
+    setState(() {
+      _isSubmitting = true;
+      _error = null;
+    });
+    try {
+      await ref.read(customerRepositoryProvider).cancelScheduledPlanChange();
+      ref.invalidate(currentSubscriptionProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('You will stay on your current plan.')));
+      }
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _upgrade(SubscriptionPlan targetPlan) async {
@@ -152,6 +209,16 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
 
       if (!mounted) return;
 
+      // Downgrade: scheduled for next renewal, nothing to pay.
+      if (result['scheduled'] == true) {
+        ref.invalidate(currentSubscriptionProvider);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Your plan will change to ${targetPlan.name} on '
+              '${_formatDate(result['effective_date']?.toString())}.'),
+        ));
+        return;
+      }
+
       final orderId = result['order_id'] as int?;
       final url = result['url']?.toString();
       final paid = (url == null || orderId == null)
@@ -159,9 +226,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
           : await runPaymentFlow(context: context, ref: ref, paymentUrl: url, orderId: orderId);
 
       if (!mounted) return;
+      ref.invalidate(currentSubscriptionProvider);
 
       if (paid) {
-        ref.invalidate(currentSubscriptionProvider);
         await showDialog<void>(
           context: context,
           builder: (_) => AlertDialog(
@@ -282,6 +349,47 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                               Text('Current plan: ${currentPlan.name}',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                               Text(quotaText),
+                              Builder(builder: (context) {
+                                final scheduled = currentSub?['scheduled_plan_code']?.toString();
+                                if (scheduled == null || scheduled.isEmpty) return const SizedBox.shrink();
+                                var name = scheduled;
+                                for (final p in plans) {
+                                  if (p.code.trim().toLowerCase() == scheduled.trim().toLowerCase()) name = p.name;
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(children: [
+                                          const Icon(Icons.schedule, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Changing to $name on ${_formatDate(currentSub?['end_date']?.toString())}',
+                                              style: const TextStyle(fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
+                                        ]),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: TextButton(
+                                            onPressed: _isSubmitting ? null : _keepCurrentPlan,
+                                            child: const Text('Keep current plan'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
                             ],
                           ),
                         ),
@@ -304,14 +412,24 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       if (isActive && currentPlan != null) {
                         final isCurrent = p.code.trim().toLowerCase() == currentPlanCode?.trim().toLowerCase();
                         final isHigher = p.price > currentPlan!.price;
+                        final isLower = !isCurrent && p.price < currentPlan.price;
+                        final scheduled = currentSub?['scheduled_plan_code']?.toString().trim().toLowerCase();
+                        final isScheduled = isLower && scheduled == p.code.trim().toLowerCase();
                         return _PlanCard(
                           plan: p,
                           isSelected: false,
                           isCurrent: isCurrent,
                           topup: isHigher ? (p.price - currentPlan.price) : null,
-                          onTap: isHigher
-                              ? () => _confirmAndUpgrade(p, p.price - currentPlan!.price)
-                              : null,
+                          downgradeLabel: isScheduled
+                              ? 'Starts next renewal'
+                              : (isLower ? 'Switch at renewal' : null),
+                          onTap: _isSubmitting
+                              ? null
+                              : isHigher
+                                  ? () => _confirmAndUpgrade(p, p.price - currentPlan!.price)
+                                  : (isLower && !isScheduled)
+                                      ? () => _confirmAndDowngrade(p, currentPlan!)
+                                      : null,
                         );
                       }
                       return _PlanCard(
@@ -431,17 +549,19 @@ class _PlanCard extends StatelessWidget {
     required this.onTap,
     this.isCurrent = false,
     this.topup,
+    this.downgradeLabel,
   });
   final SubscriptionPlan plan;
   final bool isSelected;
   final bool isCurrent;
   final double? topup;
+  final String? downgradeLabel;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final disabled = onTap == null && !isCurrent;
+    final disabled = onTap == null && !isCurrent && downgradeLabel != 'Starts next renewal';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -455,7 +575,7 @@ class _PlanCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                if (topup == null && !isCurrent)
+                if (topup == null && downgradeLabel == null && !isCurrent)
                   Radio<String>(
                     value: plan.code,
                     groupValue: isSelected ? plan.code : null,
@@ -484,6 +604,15 @@ class _PlanCard extends StatelessWidget {
                           style: const TextStyle(fontSize: 12, color: Colors.grey)),
                       Text('Upgrade: +RM${topup!.toStringAsFixed(2)}',
                           style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  )
+                else if (downgradeLabel != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('RM${plan.price.toStringAsFixed(2)}/mo',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(downgradeLabel!, style: const TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   )
                 else

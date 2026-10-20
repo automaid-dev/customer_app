@@ -491,11 +491,13 @@ class CustomerRepository {
     return _data(json, fallback: 'Could not subscribe.');
   }
 
-  /// Upgrades the customer's active subscription to a higher tier.
-  /// [planCode] must be a strictly higher tier than their current plan —
-  /// the backend rejects downgrades here. Returns a payment URL for the
-  /// topup amount (the flat price difference, not the full new-plan
-  /// price) plus order_id for verification, same pattern as subscribe().
+  /// Changes the customer's active plan.
+  /// - Higher tier: returns a payment URL for the price difference plus
+  ///   order_id. For saved-card gateways (GKash, Revenue Monster) the URL
+  ///   charges the saved card directly (`saved_card: true`); for Fiuu it
+  ///   opens checkout.
+  /// - Lower tier: nothing is charged; returns `scheduled: true` and
+  ///   `effective_date` — the new plan and price start at next renewal.
   /// On confirmed payment, the backend switches plan_code on the
   /// existing subscription and resets this cycle's order-quota usage —
   /// no new subscription record, no additional address/billing fields
@@ -550,6 +552,12 @@ class CustomerRepository {
       if (id != null) 'id': id,
     });
     _data(json, fallback: 'Could not update notifications.');
+  }
+
+  /// Drops a scheduled downgrade so the current plan continues.
+  Future<void> cancelScheduledPlanChange() async {
+    final json = await _api.post(ApiEndpoints.customerSubscriptionScheduledCancel);
+    _data(json, fallback: 'Could not keep your current plan.');
   }
 
   Future<Map<String, dynamic>> updateSubscription() async {

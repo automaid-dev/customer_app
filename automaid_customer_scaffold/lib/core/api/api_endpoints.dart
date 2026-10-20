@@ -101,6 +101,7 @@ class ApiEndpoints {
   static const customerSubscriptionUpdate = '/customer/subscription/update';
   static const customerSubscriptionUpgrade = '/customer/subscription/upgrade';
   static const customerSubscriptionHistory = '/customer/subscription/history';
+  static const customerSubscriptionScheduledCancel = '/customer/subscription/scheduled/cancel';
   static const customerNotifications = '/customer/notifications';
   static const customerNotificationsRead = '/customer/notifications/read';
 
