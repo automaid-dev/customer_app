@@ -32,7 +32,8 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   /// all be routed to either gateway via the admin toggle) — only
   /// matching '/webhook/fiuu/' meant a GKash payment would never be
   /// detected as finished here at all.
-  bool _isReturnUrl(String url) => url.contains('/webhook/fiuu/') || url.contains('/webhook/gkash/');
+  bool _isReturnUrl(String url) =>
+      url.contains('/webhook/fiuu/') || url.contains('/webhook/gkash/') || url.contains('/webhook/rm/');
 
   @override
   void initState() {
