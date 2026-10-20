@@ -131,7 +131,7 @@ class CustomerRepository {
     // AppSetting (bag price, wash fee, delivery price, all of it), not
     // just the one that happened to get noticed first.
     final data = json['setting'] as Map<String, dynamic>? ?? {};
-    return AppSetting.fromJson(data);
+    return AppSetting.fromJson({...data, '_service_charge': json['service_charge']});
   }
 
   // ---- Addresses ----

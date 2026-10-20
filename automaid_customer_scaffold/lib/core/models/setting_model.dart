@@ -19,6 +19,12 @@ class AppSetting {
   final String? companyRegistrationNo;
   final String? sameDayCutoffTime;
 
+  /// Payment gateway service charge % per payment type (0 = none).
+  final double serviceChargeBooking;
+  final double serviceChargeDryCleaning;
+  final double serviceChargeBagPurchase;
+  final double serviceChargeSubscription;
+
   AppSetting({
     required this.washFee,
     required this.deliveryPrice,
@@ -37,6 +43,10 @@ class AppSetting {
     this.companyEmail,
     this.companyRegistrationNo,
     this.sameDayCutoffTime,
+    this.serviceChargeBooking = 0,
+    this.serviceChargeDryCleaning = 0,
+    this.serviceChargeBagPurchase = 0,
+    this.serviceChargeSubscription = 0,
   });
 
   factory AppSetting.fromJson(Map<String, dynamic> json) => AppSetting(
@@ -58,6 +68,12 @@ class AppSetting {
         companyEmail: json['company_email']?.toString(),
         companyRegistrationNo: json['company_registration_no']?.toString(),
         sameDayCutoffTime: json['same_day_cutoff_time']?.toString(),
+        // From the response's top-level `service_charge` (see
+        // CustomerRepository.setting), merged in under this key.
+        serviceChargeBooking: _d((json['_service_charge'] as Map?)?['booking']),
+        serviceChargeDryCleaning: _d((json['_service_charge'] as Map?)?['dry_cleaning']),
+        serviceChargeBagPurchase: _d((json['_service_charge'] as Map?)?['bag_purchase']),
+        serviceChargeSubscription: _d((json['_service_charge'] as Map?)?['subscription']),
       );
 
   static double _d(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;

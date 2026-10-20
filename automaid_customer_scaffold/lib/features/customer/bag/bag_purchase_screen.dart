@@ -8,6 +8,7 @@ import '../address/address_preview_card.dart';
 import '../providers/customer_providers.dart';
 import '../payment/payment_flow.dart';
 import 'bag_receipt_screen.dart';
+import '../../../core/utils/service_charge.dart';
 
 /// Purchases one or more bags at the admin-configured `bag_price`
 /// (Settings > bag_price) — matches OrderBagController::placeOrder exactly.
@@ -193,10 +194,27 @@ class _BagPurchaseScreenState extends ConsumerState<BagPurchaseScreen> {
           ),
           if (settingAsync.valueOrNull != null) ...[
             const SizedBox(height: 16),
-            Text(
-              'Total: RM${(settingAsync.value!.bagPrice * _quantity).toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            Builder(builder: (context) {
+              final setting = settingAsync.value!;
+              final subtotal = setting.bagPrice * _quantity;
+              // Payment gateway service charge (admin %, 0 = none).
+              final charge = serviceChargeFor(subtotal, setting.serviceChargeBagPurchase);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (charge > 0) ...[
+                    Text('Bags: RM${subtotal.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey[700])),
+                    Text('${serviceChargeLabel(setting.serviceChargeBagPurchase)}: RM${charge.toStringAsFixed(2)}',
+                        style: TextStyle(color: Colors.grey[700])),
+                    const SizedBox(height: 4),
+                  ],
+                  Text(
+                    'Total: RM${(subtotal + charge).toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              );
+            }),
           ],
           if (_error != null) ...[
             const SizedBox(height: 12),

@@ -6,6 +6,7 @@ import '../../../core/models/setting_model.dart';
 import '../providers/customer_providers.dart';
 import '../payment/receipt_pdf.dart';
 import '../../../core/widgets/error_state_view.dart';
+import '../../../core/utils/service_charge.dart';
 
 /// A simple receipt view for a bag-purchase order — reuses the same
 /// `orderDetail` endpoint the Orders screens use (an Order row is an
@@ -85,6 +86,8 @@ class _BagReceiptScreenState extends ConsumerState<BagReceiptScreen> {
       MapEntry('Quantity', '${order['quantity'] ?? '-'} bag(s)'),
       MapEntry('Status', '${order['status'] ?? '-'}'),
       MapEntry('Subtotal', 'RM${order['sub_total']?.toString() ?? '0.00'}'),
+      if (orderGatewayFee(order) > 0)
+        MapEntry(orderGatewayFeeLabel(order), 'RM${orderGatewayFee(order).toStringAsFixed(2)}'),
       MapEntry('Grand total', 'RM${order['grand_total']?.toString() ?? '0.00'}'),
     ];
     final bytes = await buildReceiptPdf(
@@ -144,6 +147,8 @@ class _ReceiptBody extends ConsumerWidget {
                   _ReceiptRow(label: 'Payment status', value: '${payment['status'] ?? '-'}'),
                 const Divider(height: 32),
                 _ReceiptRow(label: 'Subtotal', value: 'RM$subTotal'),
+                if (orderGatewayFee(order) > 0)
+                  _ReceiptRow(label: orderGatewayFeeLabel(order), value: 'RM${orderGatewayFee(order).toStringAsFixed(2)}'),
                 _ReceiptRow(
                   label: 'Grand total',
                   value: 'RM$grandTotal',

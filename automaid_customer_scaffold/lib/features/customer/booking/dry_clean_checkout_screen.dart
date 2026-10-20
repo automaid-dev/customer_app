@@ -12,6 +12,7 @@ import 'dry_clean_draft_provider.dart';
 import 'pickup_handoff_capture.dart';
 import 'waiting_list_dialog.dart';
 import '../payment/payment_flow.dart';
+import '../../../core/utils/service_charge.dart';
 
 class DryCleanCheckoutScreen extends ConsumerStatefulWidget {
   const DryCleanCheckoutScreen({super.key});
@@ -247,6 +248,18 @@ class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen>
   Widget build(BuildContext context) {
     final draft = ref.watch(dryCleanDraftProvider);
     final addressesAsync = ref.watch(addressListProvider);
+    // Payment gateway service charge (admin %, 0 = none) — only when this
+    // booking will actually go to the payment page.
+    final chargePercent = ref.watch(appSettingProvider).valueOrNull?.serviceChargeDryCleaning ?? 0;
+    final subscribed = ref.watch(currentSubscriptionProvider).valueOrNull?['status'] == 'active';
+    final serviceCharge = bookingNeedsPayment(
+      grandTotal: draft.grandTotal,
+      subscribed: subscribed,
+      addonCharge: draft.addonCharge,
+      taxCharge: draft.taxCharge,
+    )
+        ? serviceChargeFor(draft.grandTotal, chargePercent)
+        : 0.0;
 
     return Scaffold(
       appBar: AppBar(title: const Text('New dry-cleaning booking')),
@@ -564,8 +577,9 @@ class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen>
                 if (draft.sstPercent > 0) _SummaryRow('SST (${draft.sstPercent.toStringAsFixed(0)}%)', draft.taxCharge),
                 if (draft.insuranceSelected) _SummaryRow('Risk-Free Insurance', draft.insuranceFee),
                 if (draft.voucher != null) _SummaryRow('Voucher discount', -draft.voucherDiscountAmount),
+                if (serviceCharge > 0) _SummaryRow(serviceChargeLabel(chargePercent), serviceCharge),
                 const Divider(),
-                Text('Grand total: RM${draft.grandTotal.toStringAsFixed(2)}',
+                Text('Grand total: RM${(draft.grandTotal + serviceCharge).toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 if (_error != null) ...[
                   const SizedBox(height: 8),

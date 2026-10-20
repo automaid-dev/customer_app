@@ -7,6 +7,7 @@ import '../providers/customer_providers.dart';
 import '../payment/receipt_pdf.dart';
 import 'order_display.dart';
 import '../../../core/widgets/error_state_view.dart';
+import '../../../core/utils/service_charge.dart';
 
 /// Downloadable receipt for a booking (laundry pickup/delivery) order —
 /// same pattern as BagReceiptScreen and the subscription receipt, just
@@ -99,6 +100,8 @@ class _BookingReceiptScreenState extends ConsumerState<BookingReceiptScreen> {
       if ((double.tryParse(order['insurance_fee']?.toString() ?? '0') ?? 0) > 0)
         MapEntry('Risk-Free Insurance', 'RM${(double.tryParse(order['insurance_fee'].toString()) ?? 0).toStringAsFixed(2)}'),
       if (booking?['tax'] != null) MapEntry('SST', 'RM${booking!['tax']}'),
+      if (orderGatewayFee(order) > 0)
+        MapEntry(orderGatewayFeeLabel(order), 'RM${orderGatewayFee(order).toStringAsFixed(2)}'),
       MapEntry('Grand total', 'RM${order['grand_total']?.toString() ?? booking?['grand_total']?.toString() ?? '0.00'}'),
     ];
     final merchantName = order['merchant_name']?.toString();
@@ -206,6 +209,8 @@ class _ReceiptBody extends ConsumerWidget {
                 if (insuranceFee > 0)
                   _ReceiptRow(label: 'Risk-Free Insurance', value: 'RM${insuranceFee.toStringAsFixed(2)}'),
                 if (booking?['tax'] != null) _ReceiptRow(label: 'SST', value: 'RM${booking!['tax']}'),
+                if (orderGatewayFee(order) > 0)
+                  _ReceiptRow(label: orderGatewayFeeLabel(order), value: 'RM${orderGatewayFee(order).toStringAsFixed(2)}'),
                 const Divider(height: 32),
                 _ReceiptRow(label: 'Grand total', value: 'RM$grandTotal', emphasize: true),
                 const Divider(height: 32),

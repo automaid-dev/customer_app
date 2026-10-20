@@ -9,6 +9,7 @@ import '../address/address_preview_card.dart';
 import '../payment/payment_flow.dart';
 import '../providers/customer_providers.dart';
 import 'subscription_history_screen.dart';
+import '../../../core/utils/service_charge.dart';
 
 /// Subscription always routes through the payment gateway on this backend
 /// — so both subscribing and upgrading open a payment link rather than
@@ -107,13 +108,16 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   }
 
   Future<void> _confirmAndUpgrade(SubscriptionPlan targetPlan, double topup) async {
+    final pct = ref.read(appSettingProvider).valueOrNull?.serviceChargeSubscription ?? 0;
+    final charge = serviceChargeFor(topup, pct);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Upgrade to ${targetPlan.name}?'),
         content: Text(
-          "You'll pay RM${topup.toStringAsFixed(2)} now (the difference from your current "
-          'plan). Your next renewal will bill the full ${targetPlan.name} price going forward.',
+          "You'll pay RM${(topup + charge).toStringAsFixed(2)} now (the difference from your current "
+          'plan${charge > 0 ? ' of RM${topup.toStringAsFixed(2)}, plus RM${charge.toStringAsFixed(2)} ${kServiceChargeLabel.toLowerCase()}' : ''}). '
+          'Your next renewal will bill the full ${targetPlan.name} price going forward.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
@@ -376,6 +380,25 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 const SizedBox(height: 12),
                 Text(_error!, style: const TextStyle(color: Colors.red)),
               ],
+              // Payment gateway service charge (admin %, 0 = none).
+              Builder(builder: (context) {
+                final pct = ref.watch(appSettingProvider).valueOrNull?.serviceChargeSubscription ?? 0;
+                if (pct <= 0) return const SizedBox.shrink();
+                SubscriptionPlan? selected;
+                for (final p in plansAsync.valueOrNull ?? <SubscriptionPlan>[]) {
+                  if (p.code == _selectedPlanCode) selected = p;
+                }
+                final text = (!isActive && selected != null)
+                    ? 'Plan RM${selected.price.toStringAsFixed(2)} + ${serviceChargeLabel(pct)} '
+                        'RM${serviceChargeFor(selected.price, pct).toStringAsFixed(2)} = '
+                        'RM${(selected.price + serviceChargeFor(selected.price, pct)).toStringAsFixed(2)} today. '
+                        'Each monthly renewal includes the same ${percentText(pct)}% charge.'
+                    : 'A ${percentText(pct)}% payment gateway service charge is added to each subscription payment and monthly renewal.';
+                return Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Text(text, style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+                );
+              }),
               const SizedBox(height: 24),
               if (!isActive)
                 FilledButton(

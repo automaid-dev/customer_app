@@ -12,6 +12,7 @@ import '../providers/customer_providers.dart';
 import 'booking_draft_provider.dart';
 import 'pickup_handoff_capture.dart';
 import 'waiting_list_dialog.dart';
+import '../../../core/utils/service_charge.dart';
 
 /// Booking flow, step by step:
 /// 1. Bag quantity -> calculateRate
@@ -614,6 +615,18 @@ class _ScheduleStep extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final addressesAsync = ref.watch(addressListProvider);
     final repo = ref.read(customerRepositoryProvider);
+    // Payment gateway service charge (admin %, 0 = none) — only when this
+    // booking will actually go to the payment page.
+    final chargePercent = ref.watch(appSettingProvider).valueOrNull?.serviceChargeBooking ?? 0;
+    final subscribed = ref.watch(currentSubscriptionProvider).valueOrNull?['status'] == 'active';
+    final serviceCharge = bookingNeedsPayment(
+      grandTotal: draft.grandTotal,
+      subscribed: subscribed,
+      addonCharge: draft.addonCharge,
+      taxCharge: draft.taxCharge,
+    )
+        ? serviceChargeFor(draft.grandTotal, chargePercent)
+        : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -740,8 +753,9 @@ class _ScheduleStep extends ConsumerWidget {
         if (draft.birthdayRewardSelected) _SummaryRow('Birthday reward', -draft.birthdayRewardAmount),
         _SummaryRow('Delivery charge', draft.deliveryCharge),
         if (draft.sstPercent > 0) _SummaryRow('SST (${draft.sstPercent.toStringAsFixed(0)}%)', draft.taxCharge),
+        if (serviceCharge > 0) _SummaryRow(serviceChargeLabel(chargePercent), serviceCharge),
         const Divider(),
-        Text('Grand total: RM${draft.grandTotal.toStringAsFixed(2)}',
+        Text('Grand total: RM${(draft.grandTotal + serviceCharge).toStringAsFixed(2)}',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         if (error != null) ...[
           const SizedBox(height: 8),
