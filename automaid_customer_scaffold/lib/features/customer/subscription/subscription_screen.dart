@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/models/address_model.dart';
@@ -319,11 +320,22 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const Text(
-                'Every plan includes 1 free bag wash per order (delivery is '
-                'charged separately at the standard rate). Extra bags in the '
-                'same order are charged the normal per-bag wash and delivery rate.',
-              ),
+              Text('Subscription plans',
+                  style: GoogleFonts.fraunces(
+                      fontSize: 28, fontWeight: FontWeight.w600, color: const Color(0xFF0E2240))),
+              const SizedBox(height: 8),
+              Builder(builder: (context) {
+                final plans = plansAsync.valueOrNull ?? <SubscriptionPlan>[];
+                final bags = plans.isEmpty ? 1 : plans.first.freeBagWashPerOrder;
+                final anyDryClean = plans.any((p) => p.drycleanDiscountPercent > 0);
+                return Text(
+                  'Every plan includes $bags free bag wash${bags == 1 ? '' : 'es'} per order'
+                  '${anyDryClean ? ', plus a discount on dry cleaning' : ''}. '
+                  'Delivery is charged separately at the standard rate, and extra bags in the '
+                  'same order are charged the normal per-bag rate.',
+                  style: const TextStyle(color: Color(0xFF3D4A5C), height: 1.4),
+                );
+              }),
               const SizedBox(height: 16),
               plansAsync.when(
                 data: (plans) {
@@ -542,6 +554,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   }
 }
 
+/// Plan card styled after the lbunlimitedwash.com pricing section:
+/// serif tier label + price, divider, orders line, ticked benefits, and a
+/// full-width pill button. Platinum is the highlighted navy card with a
+/// yellow button. Price, orders, free bags per order and the dry-cleaning
+/// discount all come from admin Settings via POST /subscription/plans.
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.plan,
@@ -558,69 +575,184 @@ class _PlanCard extends StatelessWidget {
   final String? downgradeLabel;
   final VoidCallback? onTap;
 
+  static const _navy = Color(0xFF0A3A80);
+  static const _ink = Color(0xFF0E2240);
+  static const _gold = Color(0xFFF2C14E);
+
+  String _money(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+  String _pct(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final disabled = onTap == null && !isCurrent && downgradeLabel != 'Starts next renewal';
+    final dark = plan.isPlatinum;
+    final fg = dark ? Colors.white : _ink;
+    final soft = dark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF3D4A5C);
+    final tick = dark ? _gold : _navy;
+    final serif = GoogleFonts.fraunces();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      color: isSelected || isCurrent ? scheme.primaryContainer : null,
+    final bags = plan.freeBagWashPerOrder;
+    final benefits = <InlineSpan>[
+      TextSpan(text: '$bags free bag wash${bags == 1 ? '' : 'es'} per order'),
+      if (plan.audience.isNotEmpty) TextSpan(text: plan.audience),
+      const TextSpan(text: 'Delivery charged separately at the standard rate'),
+      if (plan.drycleanDiscountPercent > 0)
+        TextSpan(children: [
+          TextSpan(
+              text: '${_pct(plan.drycleanDiscountPercent)}% off',
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          const TextSpan(text: '  dry cleaning'),
+        ]),
+    ];
+
+    // Button wording reflects what tapping will do.
+    final String label;
+    if (isCurrent) {
+      label = 'Current plan';
+    } else if (topup != null) {
+      label = 'Upgrade  ·  +RM${topup!.toStringAsFixed(2)} now';
+    } else if (downgradeLabel != null) {
+      label = downgradeLabel!;
+    } else if (isSelected) {
+      label = 'Selected';
+    } else {
+      label = 'Choose ${plan.name}';
+    }
+    final enabled = onTap != null;
+
+    final Widget button;
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(28));
+    const pad = EdgeInsets.symmetric(vertical: 15);
+    final text = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isCurrent || isSelected) ...[const Icon(Icons.check, size: 18), const SizedBox(width: 6)],
+        Flexible(
+          child: Text(label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        ),
+      ],
+    );
+    if (dark) {
+      button = FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: _gold,
+          foregroundColor: _ink,
+          disabledBackgroundColor: _gold.withValues(alpha: 0.55),
+          disabledForegroundColor: _ink.withValues(alpha: 0.8),
+          padding: pad,
+          shape: shape,
+        ),
+        child: text,
+      );
+    } else if (isSelected || isCurrent) {
+      button = FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: _navy,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: _navy.withValues(alpha: 0.85),
+          disabledForegroundColor: Colors.white,
+          padding: pad,
+          shape: shape,
+        ),
+        child: text,
+      );
+    } else {
+      button = OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _ink,
+          disabledForegroundColor: _ink.withValues(alpha: 0.45),
+          side: BorderSide(color: Colors.grey.shade300),
+          padding: pad,
+          shape: shape,
+        ),
+        child: text,
+      );
+    }
+
+    final highlight = isSelected || isCurrent;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
       child: Opacity(
-        opacity: disabled ? 0.5 : 1,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                if (topup == null && downgradeLabel == null && !isCurrent)
-                  Radio<String>(
-                    value: plan.code,
-                    groupValue: isSelected ? plan.code : null,
-                    onChanged: onTap == null ? null : (_) => onTap!(),
-                  ),
-                if (isCurrent) const Padding(
-                  padding: EdgeInsets.only(right: 12),
-                  child: Icon(Icons.check_circle, color: Colors.green),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(plan.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(plan.quotaLabel),
-                    ],
-                  ),
-                ),
-                if (isCurrent)
-                  const Text('Current plan', style: TextStyle(fontWeight: FontWeight.bold))
-                else if (topup != null)
-                  Column(
+        opacity: (!enabled && !isCurrent && downgradeLabel != 'Starts next renewal') ? 0.6 : 1,
+        child: Material(
+          color: dark ? _navy : Colors.white,
+          elevation: dark ? 6 : 0,
+          shadowColor: _navy.withValues(alpha: 0.35),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: dark
+                ? (highlight ? const BorderSide(color: _gold, width: 2) : BorderSide.none)
+                : BorderSide(
+                    color: highlight ? _navy : const Color(0xFFDCE6F2),
+                    width: highlight ? 2 : 1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(plan.name,
+                      style: serif.copyWith(fontSize: 15, color: dark ? _gold : const Color(0xFF1E5BB8))),
+                  const SizedBox(height: 6),
+                  Text(plan.tagline,
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: fg)),
+                  const SizedBox(height: 14),
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('RM${plan.price.toStringAsFixed(2)}/mo',
-                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      Text('Upgrade: +RM${topup!.toStringAsFixed(2)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('RM${_money(plan.price)}',
+                          style: serif.copyWith(
+                              fontSize: 40, fontWeight: FontWeight.w600, color: fg, height: 1)),
+                      const SizedBox(width: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text('/ month', style: TextStyle(fontSize: 13, color: soft)),
+                      ),
                     ],
-                  )
-                else if (downgradeLabel != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('RM${plan.price.toStringAsFixed(2)}/mo',
-                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      Text(downgradeLabel!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  )
-                else
-                  Text(
-                    'RM${plan.price.toStringAsFixed(2)}/mo',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    child: Divider(
+                        height: 1, color: dark ? Colors.white.withValues(alpha: 0.2) : const Color(0xFFDCE6F2)),
+                  ),
+                  Text.rich(
+                    TextSpan(children: [
+                      TextSpan(
+                          text: plan.orderQuota == null ? 'Unlimited orders' : '${plan.orderQuota} orders',
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const TextSpan(text: ' a month'),
+                    ]),
+                    style: TextStyle(fontSize: 14.5, color: fg),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final b in benefits)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 9),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Icon(Icons.check, size: 18, color: tick),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text.rich(b, style: TextStyle(fontSize: 14, color: soft, height: 1.35)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  SizedBox(width: double.infinity, child: button),
+                ],
+              ),
             ),
           ),
         ),
