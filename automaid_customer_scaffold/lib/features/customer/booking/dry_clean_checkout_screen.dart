@@ -176,11 +176,13 @@ class _DryCleanCheckoutScreenState extends ConsumerState<DryCleanCheckoutScreen>
   /// > Legal Documents), same as the normal booking flow.
   Future<bool> _requireTermsAcceptance() async {
     final setting = await ref.read(customerRepositoryProvider).setting();
-    final url = setting.termsConditionsUrl;
+    final url = setting.termsDocumentUrl;
     if (url == null || url.isEmpty) return true;
 
     final accepted = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => TermsConditionsScreen(pdfUrl: url)),
+      MaterialPageRoute(
+        builder: (_) => TermsConditionsScreen(url: url, isWebPage: setting.termsIsWebPage),
+      ),
     );
     return accepted == true;
   }

@@ -115,8 +115,20 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     return gw == 'gkash' || gw == 'revenuemonster';
   }
 
+  /// Subscription service charge % for this customer: their own
+  /// gateway's rate when subscribed, otherwise the new sign-up rate.
+  double _subscriptionChargePercent({bool watch = false}) {
+    final setting = watch ? ref.watch(appSettingProvider).valueOrNull : ref.read(appSettingProvider).valueOrNull;
+    if (setting == null) return 0;
+    final sub = watch ? ref.watch(currentSubscriptionProvider).valueOrNull : ref.read(currentSubscriptionProvider).valueOrNull;
+    final active = sub != null && sub['status'] == 'active';
+    return active
+        ? setting.subscriptionServiceChargeFor(sub?['payment_gateway']?.toString())
+        : setting.serviceChargeSubscription;
+  }
+
   Future<void> _confirmAndUpgrade(SubscriptionPlan targetPlan, double topup) async {
-    final pct = ref.read(appSettingProvider).valueOrNull?.serviceChargeSubscription ?? 0;
+    final pct = _subscriptionChargePercent();
     final charge = serviceChargeFor(topup, pct);
     final savedCard = _usesSavedCard;
     final confirmed = await showDialog<bool>(
@@ -512,7 +524,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               ],
               // Payment gateway service charge (admin %, 0 = none).
               Builder(builder: (context) {
-                final pct = ref.watch(appSettingProvider).valueOrNull?.serviceChargeSubscription ?? 0;
+                final pct = _subscriptionChargePercent(watch: true);
                 if (pct <= 0) return const SizedBox.shrink();
                 SubscriptionPlan? selected;
                 for (final p in plansAsync.valueOrNull ?? <SubscriptionPlan>[]) {

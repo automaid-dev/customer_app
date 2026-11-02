@@ -12,6 +12,11 @@ class AppSetting {
   final double discountLimit;
   final double birthdayRewardAmount;
   final String? termsConditionsUrl;
+
+  /// What to show for Terms & Conditions (Settings > Legal Documents):
+  /// 'html' = a web page link, 'pdf' = the uploaded PDF, null = none set.
+  final String? termsViewType;
+  final String? termsViewUrl;
   final String? companyName;
   final String? companyAddress;
   final String? companyPhone;
@@ -25,6 +30,30 @@ class AppSetting {
   final double serviceChargeBagPurchase;
   final double serviceChargeSubscription;
 
+  /// Subscription service charge % per gateway. Existing subscribers stay
+  /// on the gateway they signed up with, so upgrades use their gateway's
+  /// rate rather than the one set for new sign-ups.
+  final Map<String, double> serviceChargeSubscriptionByGateway;
+
+  /// Subscription service charge % for [gateway] (the subscriber's own
+  /// `payment_gateway`), falling back to the new sign-up rate.
+  double subscriptionServiceChargeFor(String? gateway) {
+    final g = gateway?.trim().toLowerCase();
+    if (g != null && serviceChargeSubscriptionByGateway.containsKey(g)) {
+      return serviceChargeSubscriptionByGateway[g]!;
+    }
+    return serviceChargeSubscription;
+  }
+
+  /// True when T&C should be shown as a web page instead of the PDF.
+  bool get termsIsWebPage => termsViewType == 'html' && (termsViewUrl ?? '').isNotEmpty;
+
+  /// The document to show for T&C (web page or PDF), or null if none.
+  String? get termsDocumentUrl {
+    if ((termsViewUrl ?? '').isNotEmpty) return termsViewUrl;
+    return (termsConditionsUrl ?? '').isNotEmpty ? termsConditionsUrl : null;
+  }
+
   AppSetting({
     required this.washFee,
     required this.deliveryPrice,
@@ -37,6 +66,8 @@ class AppSetting {
     required this.discountLimit,
     required this.birthdayRewardAmount,
     this.termsConditionsUrl,
+    this.termsViewType,
+    this.termsViewUrl,
     this.companyName,
     this.companyAddress,
     this.companyPhone,
@@ -47,6 +78,7 @@ class AppSetting {
     this.serviceChargeDryCleaning = 0,
     this.serviceChargeBagPurchase = 0,
     this.serviceChargeSubscription = 0,
+    this.serviceChargeSubscriptionByGateway = const {},
   });
 
   factory AppSetting.fromJson(Map<String, dynamic> json) => AppSetting(
@@ -62,6 +94,8 @@ class AppSetting {
         discountLimit: _d(json['discount_limit']),
         birthdayRewardAmount: _d(json['birthday_reward_amount']),
         termsConditionsUrl: json['terms_conditions_url']?.toString(),
+        termsViewType: (json['terms_conditions_view'] as Map?)?['type']?.toString(),
+        termsViewUrl: (json['terms_conditions_view'] as Map?)?['url']?.toString(),
         companyName: json['company_name']?.toString(),
         companyAddress: json['company_address']?.toString(),
         companyPhone: json['company_phone']?.toString(),
@@ -74,6 +108,10 @@ class AppSetting {
         serviceChargeDryCleaning: _d((json['_service_charge'] as Map?)?['dry_cleaning']),
         serviceChargeBagPurchase: _d((json['_service_charge'] as Map?)?['bag_purchase']),
         serviceChargeSubscription: _d((json['_service_charge'] as Map?)?['subscription']),
+        serviceChargeSubscriptionByGateway: {
+          for (final e in (((json['_service_charge'] as Map?)?['subscription_by_gateway'] as Map?) ?? {}).entries)
+            e.key.toString(): _d(e.value),
+        },
       );
 
   static double _d(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;
