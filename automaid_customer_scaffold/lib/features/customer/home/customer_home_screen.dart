@@ -8,6 +8,7 @@ import '../../../core/widgets/dashboard_banner.dart';
 import '../../../core/widgets/promo_banner_carousel.dart';
 import '../providers/customer_providers.dart';
 import '../booking/booking_flow_screen.dart';
+import '../booking/booking_guide.dart';
 import '../booking/dry_clean_item_selection_screen.dart';
 import '../orders/order_list_screen.dart';
 import '../subscription/subscription_screen.dart';
@@ -72,7 +73,12 @@ class _HomeTab extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('New booking'),
-        onPressed: () => _showBookingTypeSheet(context),
+        // Packing instructions first (until "Don't show this again"),
+        // then the Wash & Fold / Dry Cleaning choice.
+        onPressed: () async {
+          final proceed = await BookingGuide.showIfNeeded(context);
+          if (proceed && context.mounted) _showBookingTypeSheet(context);
+        },
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(homeBookingsProvider),
@@ -163,8 +169,20 @@ class _HomeTab extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('What are we booking?', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('What are we booking?', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.help_outline, size: 18),
+                    label: const Text('How booking works'),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    onPressed: () => BookingGuide.show(context, fromHelpLink: true),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               _BookingTypeOption(
                 imageAsset: 'assets/images/wash_and_fold.jpeg',
                 title: 'Wash & Fold',
