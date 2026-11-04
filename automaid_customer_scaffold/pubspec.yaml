@@ -33,8 +33,6 @@ dependencies:
 
   # Push notifications: Firebase (FCM) + OneSignal
   firebase_core: ^4.15.0
-  onesignal_flutter: ^5.7.0
-
   # Map location picker (sign-up address confirmation)
   google_maps_flutter: ^2.9.0
   geolocator: ^13.0.1
@@ -52,6 +50,7 @@ dependencies:
 
   # Brand type (friendly, rounded — matches the LaundryBar mascot)
   google_fonts: ^6.2.1
+  firebase_messaging: ^16.7.1
 
 dev_dependencies:
   flutter_test:

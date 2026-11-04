@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <!-- Android 13+: needed to show push notifications (was added by the
+         OneSignal SDK before; Firebase Messaging asks for it at sign-in). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:label="Pickup Delivery"
@@ -37,6 +40,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Firebase Cloud Messaging: white status-bar icon for push
+             notifications (same icon OneSignal used). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_onesignal_default" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

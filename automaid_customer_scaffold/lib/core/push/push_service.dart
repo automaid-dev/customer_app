@@ -1,23 +1,30 @@
-import 'dart:io' show Platform;
+import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:onesignal_flutter/onesignal_flutter.dart';
 import '../api/api_client.dart';
 import '../api/api_endpoints.dart';
 
-/// OneSignal App ID for the Customer app (public value — safe in source,
-/// same as kApiBaseUrl). Must match the backend's ONESIGNAL_APP_ID.
-const String kOneSignalAppId = 'eeccf597-52b6-42b9-997a-50e82e7ef57f';
+/// A push notification that arrived while the app was open, or that the
+/// customer tapped. [data] is the extra payload the backend attached
+/// (e.g. order_id, type).
+class PushMessage {
+  const PushMessage({required this.title, required this.body, required this.data});
+  final String title;
+  final String body;
+  final Map<String, dynamic> data;
+}
 
-/// Push notifications via OneSignal (delivered on Android through the
-/// automaid-app Firebase project's FCM).
+/// Push notifications via Firebase Cloud Messaging (project automaid-app).
 ///
 /// Flow: [init] once at startup -> [onSignedIn] whenever a user is signed
-/// in (fresh login, restored session, or finished registration) ->
-/// the device's OneSignal subscription ID is saved to the backend via
-/// POST /profile/device (users.device_id), which is what every
-/// Notification class pushes to -> [onSignedOut] on logout.
+/// in (fresh login, restored session, finished registration) -> this
+/// phone's FCM token is saved via POST /profile/device (users.fcm_token),
+/// which the backend's PushService sends to -> [onSignedOut] on logout.
+///
+/// Replaces the OneSignal SDK used by app versions up to 1.0.0+8; the
+/// backend still reaches those older versions through OneSignal.
 ///
 /// Every call is best-effort: a push failure must never break login.
 class PushService {
@@ -27,71 +34,102 @@ class PushService {
   bool _ready = false;
   ApiClient? _api;
   int? _userId;
-  String? _lastSentId;
+  String? _lastSentToken;
+  StreamSubscription<String>? _tokenSub;
+
+  /// Notifications received while the app is in the foreground (the
+  /// system does not show those itself) — the app shows a banner.
+  final StreamController<PushMessage> _foreground = StreamController.broadcast();
+  Stream<PushMessage> get foregroundMessages => _foreground.stream;
+
+  /// Notifications the customer tapped (app opened from the background
+  /// or from closed).
+  final StreamController<PushMessage> _opened = StreamController.broadcast();
+  Stream<PushMessage> get openedMessages => _opened.stream;
+  PushMessage? _launchMessage;
+
+  /// The notification that launched the app from closed, if any — read
+  /// once by the UI after the first frame.
+  PushMessage? takeLaunchMessage() {
+    final m = _launchMessage;
+    _launchMessage = null;
+    return m;
+  }
 
   Future<void> init() async {
     try {
-      // Uses android/app/google-services.json via the Google Services
-      // Gradle plugin — no firebase_options.dart needed on Android.
-      // Firebase is only used for FCM delivery on Android. On iOS,
-      // OneSignal delivers through Apple's APNs directly, so no
-      // GoogleService-Info.plist is needed.
-      if (Platform.isAndroid) {
-        await Firebase.initializeApp();
-      }
-      OneSignal.initialize(kOneSignalAppId);
+      // Android reads android/app/google-services.json; iOS needs
+      // ios/Runner/GoogleService-Info.plist (Firebase console → add iOS app).
+      await Firebase.initializeApp();
+      final fm = FirebaseMessaging.instance;
 
-      // The subscription ID can arrive (or change) after login — e.g.
-      // first launch before FCM finishes registering, or after the user
-      // allows notifications. Re-send it whenever it changes.
-      OneSignal.User.pushSubscription.addObserver((state) {
-        final id = state.current.id;
-        if (id != null && _userId != null) _sendDeviceId(id);
+      // iOS: also show banners while the app is open.
+      await fm.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
+
+      FirebaseMessaging.onMessage.listen((m) {
+        // Android does not display notifications while the app is open,
+        // so the app shows its own banner (iOS shows the system one).
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          _foreground.add(_toPush(m));
+        }
       });
+      FirebaseMessaging.onMessageOpenedApp.listen((m) => _opened.add(_toPush(m)));
+      final initial = await fm.getInitialMessage();
+      if (initial != null) _launchMessage = _toPush(initial);
+
       _ready = true;
     } catch (e) {
       debugPrint('PushService.init failed: $e');
     }
   }
 
+  PushMessage _toPush(RemoteMessage m) => PushMessage(
+        title: m.notification?.title ?? m.data['title']?.toString() ?? '',
+        body: m.notification?.body ?? m.data['body']?.toString() ?? '',
+        data: Map<String, dynamic>.from(m.data),
+      );
+
   Future<void> onSignedIn(ApiClient api, int userId) async {
     if (!_ready || userId <= 0) return;
     _api = api;
-    if (_userId == userId && _lastSentId != null) return; // already registered
+    if (_userId == userId && _lastSentToken != null) return; // already registered
     _userId = userId;
     try {
-      // External ID = our users.id, so admins can find this user's
-      // devices in the OneSignal dashboard.
-      await OneSignal.login(userId.toString());
-      // Android 13+ asks once; does nothing if already allowed/denied.
-      if (!OneSignal.Notifications.permission) {
-        await OneSignal.Notifications.requestPermission(false);
-      }
-      final id = OneSignal.User.pushSubscription.id;
-      if (id != null) await _sendDeviceId(id);
+      final fm = FirebaseMessaging.instance;
+      // Android 13+ / iOS ask once; does nothing if already allowed/denied.
+      await fm.requestPermission(alert: true, badge: true, sound: true);
+      final token = await fm.getToken();
+      if (token != null) await _sendToken(token);
+
+      // Tokens can change (reinstall, restore, periodic refresh).
+      _tokenSub ??= fm.onTokenRefresh.listen((t) {
+        if (_userId != null) _sendToken(t);
+      });
     } catch (e) {
       debugPrint('PushService.onSignedIn failed: $e');
     }
   }
 
-  Future<void> _sendDeviceId(String id) async {
+  Future<void> _sendToken(String token) async {
     final api = _api;
-    if (api == null || id == _lastSentId) return;
+    if (api == null || token == _lastSentToken) return;
     try {
-      await api.post(ApiEndpoints.profileSaveDevice, data: {'device_id': id});
-      _lastSentId = id;
+      await api.post(ApiEndpoints.profileSaveDevice, data: {'fcm_token': token});
+      _lastSentToken = token;
     } catch (e) {
-      debugPrint('PushService: saving device id failed: $e');
+      debugPrint('PushService: saving FCM token failed: $e');
     }
   }
 
-  /// The backend's /profile/logout already clears users.device_id.
+  /// The backend's /profile/logout already clears users.fcm_token; the
+  /// token is also deleted here so the next account on this phone gets
+  /// a fresh one.
   Future<void> onSignedOut() async {
     _userId = null;
-    _lastSentId = null;
+    _lastSentToken = null;
     if (!_ready) return;
     try {
-      await OneSignal.logout();
+      await FirebaseMessaging.instance.deleteToken();
     } catch (e) {
       debugPrint('PushService.onSignedOut failed: $e');
     }
